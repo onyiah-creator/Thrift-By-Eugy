@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { REAL_PRODUCTS } from "./products.js";
+import { forYou, trending, completeTheLook } from "./recommender.js";
 
 // ---- Brand tokens ----
 // ink #0A0A0C, gold #C9A227, gold-light #E8C56B, ivory #F3ECDD, burgundy #5C1A2B
@@ -38,6 +39,7 @@ function makeProducts(n, offset = 0) {
     const height = 220 + ((i * 97) % 140); // for masonry variety
     return {
       id: i,
+      sku: `GEN-${String(i).padStart(4, "0")}`,
       name: seedName(i),
       category: cat,
       price,
@@ -45,6 +47,9 @@ function makeProducts(n, offset = 0) {
       height,
       size: ["XS", "S", "M", "L", "XL"][i % 5],
       condition: ["Excellent", "Very Good", "Good"][i % 3],
+      quantity: 1,
+      status: "active",
+      dateAdded: `2026-07-${String((i % 28) + 1).padStart(2, "0")}`,
     };
   });
 }
@@ -121,11 +126,16 @@ export default function ThriftByEugy() {
   }, [category, query]);
 
   const recommended = useMemo(() => {
-    // mock AI rec: items from same categories as cart, else fallback random slice
-    if (cart.length === 0) return ALL_PRODUCTS.slice(4, 10);
-    const cats = new Set(cart.map((c) => c.category));
-    return ALL_PRODUCTS.filter((p) => cats.has(p.category) && !cart.find((c) => c.id === p.id)).slice(0, 6);
+    // Real engine: personalised from the bag when it has items, otherwise
+    // newest stock spread across categories.
+    if (cart.length === 0) return trending(ALL_PRODUCTS, { limit: 6 });
+    return forYou(cart, ALL_PRODUCTS, { limit: 6 });
   }, [cart]);
+
+  const lookPicks = useMemo(
+    () => (quickView ? completeTheLook(quickView, ALL_PRODUCTS, { limit: 3 }) : []),
+    [quickView]
+  );
 
   const addToCart = (p) => setCart((c) => [...c, p]);
   const removeFromCart = (id) =>
@@ -349,6 +359,39 @@ export default function ThriftByEugy() {
               <p className="text-[12px] text-[#999] mb-4">
                 Condition: {quickView.condition} · Size {quickView.size} · One-of-one piece
               </p>
+              {lookPicks.length > 0 && (
+                <div className="mb-4">
+                  <p className="text-[10px] uppercase tracking-[0.15em] text-[#666] mb-2">
+                    Complete the look
+                  </p>
+                  <div className="flex gap-2">
+                    {lookPicks.map((p) => (
+                      <button
+                        key={p.sku}
+                        onClick={() => setQuickView(p)}
+                        className="flex-1 text-left rounded-lg border border-[#2a2a2d] hover:border-[#C9A227] transition-colors overflow-hidden"
+                      >
+                        <div
+                          className="relative h-16"
+                          style={{ background: `linear-gradient(160deg, ${p.color} 0%, #0A0A0C 130%)` }}
+                        >
+                          {p.image && (
+                            <img
+                              src={p.image}
+                              alt={p.name}
+                              className="absolute inset-0 w-full h-full object-contain p-1"
+                            />
+                          )}
+                        </div>
+                        <div className="px-2 py-1.5">
+                          <p className="text-[10px] text-[#F3ECDD] leading-tight truncate">{p.name}</p>
+                          <p className="text-[10px] text-[#C9A227] font-semibold">{formatNaira(p.price)}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="flex gap-2">
                 <button
                   onClick={() => {

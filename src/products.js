@@ -11,6 +11,9 @@ export const REAL_PRODUCTS = [
     height: 300,
     size: "M",
     condition: "Excellent",
+    quantity: 1,
+    status: "active",
+    dateAdded: "2026-08-19",
     image: "/products/TBE-0001_coral-peplum-top.png",
     description:
       "Off-shoulder peplum top in coral with a crochet lace overlay neckline, button front, and elasticated waist.",
@@ -25,6 +28,9 @@ export const REAL_PRODUCTS = [
     height: 300,
     size: "S",
     condition: "Excellent",
+    quantity: 1,
+    status: "active",
+    dateAdded: "2026-08-19",
     image: "/products/TBE-0002_lime-ruffle-top.png",
     description:
       "Statement lime-green crop top with cascading pleated ruffles along the V-neckline and cropped hem.",
