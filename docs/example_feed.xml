@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
+  <channel>
+    <title>Thrift by Eugy</title>
+    <link>https://thriftbyeugy.com</link>
+    <description>Curated secondhand fashion — one-of-one preloved pieces.</description>
+    <lastBuildDate>Wed, 19 Aug 2026 18:53:32 +0000</lastBuildDate>
+    <item>
+      <g:id>TBE-0001</g:id>
+      <g:title>Coral Lace Peplum Top — Preloved</g:title>
+      <g:description>Off-shoulder cotton peplum top with crochet lace trim and elasticated waist. Excellent preloved condition, no visible wear. One-of-one preloved piece — once it's gone, it's gone. Size M.</g:description>
+      <g:link>https://thriftbyeugy.com/product/TBE-0001</g:link>
+      <g:image_link>https://thriftbyeugy.com/img/TBE-0001/1/detail</g:image_link>
+      <g:additional_image_link>https://thriftbyeugy.com/img/TBE-0001/2/detail</g:additional_image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>12500.00 NGN</g:price>
+      <g:condition>used</g:condition>
+      <g:google_product_category>212</g:google_product_category>
+      <g:product_type>Apparel &amp; Accessories &gt; Clothing &gt; Shirts &amp; Tops</g:product_type>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:color>Coral</g:color>
+      <g:size>M</g:size>
+      <g:gender>female</g:gender>
+      <g:age_group>adult</g:age_group>
+    </item>
+    <item>
+      <g:id>TBE-0002</g:id>
+      <g:title>Lime Green Ruffle Wrap Blouse — Preloved</g:title>
+      <g:description>Pleated chiffon wrap blouse with tiered ruffle detail and elasticated hem. Very good preloved condition, minimal signs of wear. One-of-one preloved piece — once it's gone, it's gone. Size S.</g:description>
+      <g:link>https://thriftbyeugy.com/product/TBE-0002</g:link>
+      <g:image_link>https://thriftbyeugy.com/img/TBE-0002/1/detail</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>9800.00 NGN</g:price>
+      <g:condition>used</g:condition>
+      <g:google_product_category>212</g:google_product_category>
+      <g:product_type>Apparel &amp; Accessories &gt; Clothing &gt; Shirts &amp; Tops</g:product_type>
+      <g:brand>Zara</g:brand>
+      <g:mpn>TBE-0002</g:mpn>
+      <g:identifier_exists>yes</g:identifier_exists>
+      <g:color>Lime Green</g:color>
+      <g:size>S</g:size>
+      <g:gender>female</g:gender>
+      <g:age_group>adult</g:age_group>
+    </item>
+    <item>
+      <g:id>TBE-0003</g:id>
+      <g:title>Blue Denim Jacket — Preloved</g:title>
+      <g:description>Classic mid-wash denim trucker jacket, slight fading at cuffs. Good preloved condition, light wear consistent with age. One-of-one preloved piece — once it's gone, it's gone. Size L.</g:description>
+      <g:link>https://thriftbyeugy.com/product/TBE-0003</g:link>
+      <g:image_link>https://thriftbyeugy.com/img/TBE-0003/1/detail</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>15000.00 NGN</g:price>
+      <g:condition>used</g:condition>
+      <g:google_product_category>5322</g:google_product_category>
+      <g:product_type>Apparel &amp; Accessories &gt; Clothing &gt; Pants</g:product_type>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:color>Blue</g:color>
+      <g:size>L</g:size>
+      <g:gender>female</g:gender>
+      <g:age_group>adult</g:age_group>
+    </item>
+    <item>
+      <g:id>TBE-0004</g:id>
+      <g:title>Emerald Silk Slip Dress — Preloved</g:title>
+      <g:description>Bias-cut genuine silk slip dress with adjustable straps. Excellent preloved condition, no visible wear. One-of-one preloved piece — once it's gone, it's gone. Size M.</g:description>
+      <g:link>https://thriftbyeugy.com/product/TBE-0004</g:link>
+      <g:image_link>https://thriftbyeugy.com/img/TBE-0004/1/detail</g:image_link>
+      <g:availability>out_of_stock</g:availability>
+      <g:price>22000.00 NGN</g:price>
+      <g:condition>used</g:condition>
+      <g:google_product_category>2271</g:google_product_category>
+      <g:product_type>Apparel &amp; Accessories &gt; Clothing &gt; Dresses</g:product_type>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:color>Emerald</g:color>
+      <g:size>M</g:size>
+      <g:gender>female</g:gender>
+      <g:age_group>adult</g:age_group>
+    </item>
+  </channel>
+</rss>

@@ -23,6 +23,15 @@ Open `#/admin` (e.g. http://localhost:5173/#/admin) for the **Add Product** page
 
 `src/SpinViewer.jsx` exports `SpinViewer`, a drag-to-rotate frame viewer (mouse, touch, arrow keys, scrub bar, auto-spin, full preload). Try the interaction at `#/spin`, which renders generated placeholder frames. Real spins are shot on the mannequin at fixed intervals and prepared with `scripts/prep_spin.py` — it applies one shared crop box across all frames so the garment doesn't jitter (photos go in `spin_raw/<SKU>/` next to the script; output lands in `spin_out/<SKU>/` with a manifest). See [docs/SPIN_GUIDE.md](docs/SPIN_GUIDE.md) for the shooting checklist and why frames beat GIF/video.
 
+## Google Merchant Center feed
+
+Two ways to produce the Shopping feed, both handling the thrift-specific pitfalls (everything `condition: used`, `identifier_exists: no` for unbranded pieces, quantity-of-one availability):
+
+- **`scripts/build_feed.py`** — generates `feed.xml` from the product spreadsheet: `python3 scripts/build_feed.py templates/ThriftByEugy_Product_Template.xlsx --out feed.xml` (add `--validate-only` to check without writing).
+- **`worker/worker-feed.js`** — Cloudflare Worker serving a live feed at `/feeds/google.xml` from a D1 `products` table, for Merchant Center scheduled fetches once the site is live.
+
+See [docs/MERCHANT_FEED_GUIDE.md](docs/MERCHANT_FEED_GUIDE.md) for the setup checklist and [docs/example_feed.xml](docs/example_feed.xml) for sample output.
+
 ## Product import template
 
 `templates/ThriftByEugy_Product_Template.xlsx` is the spreadsheet for cataloguing real inventory. It has a **Products** sheet (SKU, name, category, price, size, condition, color, brand, description, image filenames, quantity, status, date added — with one filled-in example row) and a **Legend & Instructions** sheet explaining each column.
