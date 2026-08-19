@@ -1,4 +1,5 @@
 import React, { useState, useRef } from "react";
+import { TEMonogram } from "./BrandLogo.jsx";
 
 /**
  * Thrift by Eugy — Admin: Add Product
@@ -107,11 +108,12 @@ export default function AdminUpload() {
       <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-1">
-          <div>
+          <div className="flex items-center gap-2.5">
+            <TEMonogram size={28} />
             <span className="font-display italic text-xl" style={{ color: GOLD }}>
               Thrift by Eugy
             </span>
-            <span className="text-[11px] uppercase tracking-[0.15em] text-[#666] ml-3">Admin</span>
+            <span className="text-[11px] uppercase tracking-[0.15em] text-[#666] ml-1">Admin</span>
           </div>
           <span className="text-[12px] text-[#777]">Add Product</span>
         </div>

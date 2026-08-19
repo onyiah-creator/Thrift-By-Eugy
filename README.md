@@ -6,10 +6,28 @@ Built with React, Vite, and Tailwind CSS.
 
 ## Features
 
-- **Home / Discover** — hero, AI-style recommendations, and a Pinterest-style masonry discovery grid
-- **Shop** — category filters and live search
-- **Quick view** — product detail modal with condition, size, and one-of-one notes
-- **Bag & checkout** — slide-out drawer with a 4-step flow: Bag → Delivery Details → Payment (Card / Bank Transfer / USSD) → Order confirmation with reference number, totals in naira (₦)
+The default storefront (`src/Storefront.jsx`) adapts patterns from Fashion Nova, Shein, and Pinterest with thrift-appropriate changes — see [docs/DESIGN_REFERENCES.md](docs/DESIGN_REFERENCES.md) for what was taken and what was deliberately not (no countdown timers, no fake %-off badges).
+
+- **The Edit** — named curated collections (Owambe Ready, The Lagos Workweek, Denim Broken In, Quiet Luxury)
+- **Tabbed rail** — For You (recommendation engine) / New In / Dresses / Under ₦10k
+- **Wishlist & recently viewed** — with the explicit note that saving doesn't reserve a one-of-one piece
+- **Price-forward cards** — price leads, with condition grade and "1 available" on every card
+- **Size guide** — framed around vintage sizing inconsistency
+- **Quick view** — photo, description, "Complete the look" picks, only-one-available scarcity note
+- **Bag & checkout** — 4-step flow: Bag → Delivery Details → Payment (Card / Bank Transfer / USSD) → Order confirmation, totals in naira (₦)
+
+### Routes
+
+| Hash | Page |
+| --- | --- |
+| `/` | Storefront (default) |
+| `#/classic` | Original storefront layout |
+| `#/admin` | Add Product admin panel |
+| `#/spin` | 360° spin viewer demo |
+
+## Brand
+
+`src/BrandLogo.jsx` provides the TE monogram crest and the monogram + wordmark lockup as crisp inline SVGs (vector renditions of the official logo), used in the storefront header/footer, the admin panel, the order confirmation, and as the favicon (`public/favicon.svg`).
 
 ## Admin panel
 

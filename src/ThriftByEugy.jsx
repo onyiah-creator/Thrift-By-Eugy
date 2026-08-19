@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
-import { REAL_PRODUCTS } from "./products.js";
+import { ALL_PRODUCTS, CATEGORIES as BASE_CATEGORIES } from "./catalogue.js";
 import { forYou, trending, completeTheLook } from "./recommender.js";
+import { BrandLockup } from "./BrandLogo.jsx";
 
 // ---- Brand tokens ----
 // ink #0A0A0C, gold #C9A227, gold-light #E8C56B, ivory #F3ECDD, burgundy #5C1A2B
@@ -17,44 +18,7 @@ const FLOURISH = (
   </svg>
 );
 
-const CATEGORIES = ["All", "Dresses", "Outerwear", "Denim", "Tops", "Accessories", "Shoes"];
-
-const PALETTE = [
-  "#6B2C3E", "#3E5C50", "#8A6E2F", "#3C3C6E", "#7A3B2E", "#2F5C5C", "#5C2F5C", "#4B4B23",
-];
-
-function seedName(i) {
-  const adjectives = ["Vintage", "Retro", "Classic", "Rare", "Timeless", "Boho", "Preloved", "Statement"];
-  const items = ["Trench Coat", "Silk Slip Dress", "Denim Jacket", "Wrap Blouse", "Pleated Skirt", "Knit Cardigan", "Leather Belt", "Ankle Boots", "Cotton Tee", "Wide-Leg Trousers", "Beaded Clutch", "Blazer"];
-  const a = adjectives[i % adjectives.length];
-  const b = items[(i * 3 + 1) % items.length];
-  return `${a} ${b}`;
-}
-
-function makeProducts(n, offset = 0) {
-  return Array.from({ length: n }).map((_, idx) => {
-    const i = idx + offset;
-    const cat = CATEGORIES[1 + (i % (CATEGORIES.length - 1))];
-    const price = 3500 + ((i * 733) % 18000);
-    const height = 220 + ((i * 97) % 140); // for masonry variety
-    return {
-      id: i,
-      sku: `GEN-${String(i).padStart(4, "0")}`,
-      name: seedName(i),
-      category: cat,
-      price,
-      color: PALETTE[i % PALETTE.length],
-      height,
-      size: ["XS", "S", "M", "L", "XL"][i % 5],
-      condition: ["Excellent", "Very Good", "Good"][i % 3],
-      quantity: 1,
-      status: "active",
-      dateAdded: `2026-07-${String((i % 28) + 1).padStart(2, "0")}`,
-    };
-  });
-}
-
-const ALL_PRODUCTS = [...REAL_PRODUCTS, ...makeProducts(24)];
+const CATEGORIES = ["All", ...BASE_CATEGORIES];
 
 function formatNaira(n) {
   return "₦" + n.toLocaleString("en-NG");
@@ -159,12 +123,7 @@ export default function ThriftByEugy() {
       <div className="bg-[#0A0A0C] border-b border-[#2a2a2d]">
         <div className="max-w-6xl mx-auto flex items-center justify-between px-5 py-4">
           <div className="flex items-center gap-6">
-            <span
-              className="font-display italic text-2xl tracking-tight"
-              style={{ color: "#C9A227" }}
-            >
-              Thrift by Eugy
-            </span>
+            <BrandLockup size={32} />
             <nav className="hidden md:flex gap-5 text-[13px] text-[#cfcfcf]">
               <button
                 onClick={() => setView("home")}

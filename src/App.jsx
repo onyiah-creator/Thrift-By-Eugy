@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
+import Storefront from "./Storefront.jsx";
 import ThriftByEugy from "./ThriftByEugy.jsx";
 import AdminUpload from "./AdminUpload.jsx";
 import SpinViewerDemo from "./SpinViewer.jsx";
 
 // Tiny hash router: #/admin shows the admin panel, #/spin the 360° viewer
-// demo, everything else the storefront.
+// demo, #/classic the original storefront, everything else the storefront.
 export default function App() {
   const [hash, setHash] = useState(window.location.hash);
 
@@ -16,5 +17,6 @@ export default function App() {
 
   if (hash === "#/admin") return <AdminUpload />;
   if (hash === "#/spin") return <SpinViewerDemo />;
-  return <ThriftByEugy />;
+  if (hash === "#/classic") return <ThriftByEugy />;
+  return <Storefront />;
 }
