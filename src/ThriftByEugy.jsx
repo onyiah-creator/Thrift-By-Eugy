@@ -1,0 +1,390 @@
+import React, { useState, useMemo } from "react";
+
+// ---- Brand tokens ----
+// ink #0A0A0C, gold #C9A227, gold-light #E8C56B, ivory #F3ECDD, burgundy #5C1A2B
+
+const FLOURISH = (
+  <svg viewBox="0 0 200 40" className="w-full h-6 opacity-80" preserveAspectRatio="none">
+    <path
+      d="M0 20 C 40 5, 60 5, 100 20 C 140 35, 160 35, 200 20"
+      stroke="#C9A227"
+      strokeWidth="1.5"
+      fill="none"
+    />
+    <circle cx="100" cy="20" r="2.5" fill="#E8C56B" />
+  </svg>
+);
+
+const CATEGORIES = ["All", "Dresses", "Outerwear", "Denim", "Tops", "Accessories", "Shoes"];
+
+const PALETTE = [
+  "#6B2C3E", "#3E5C50", "#8A6E2F", "#3C3C6E", "#7A3B2E", "#2F5C5C", "#5C2F5C", "#4B4B23",
+];
+
+function seedName(i) {
+  const adjectives = ["Vintage", "Retro", "Classic", "Rare", "Timeless", "Boho", "Preloved", "Statement"];
+  const items = ["Trench Coat", "Silk Slip Dress", "Denim Jacket", "Wrap Blouse", "Pleated Skirt", "Knit Cardigan", "Leather Belt", "Ankle Boots", "Cotton Tee", "Wide-Leg Trousers", "Beaded Clutch", "Blazer"];
+  const a = adjectives[i % adjectives.length];
+  const b = items[(i * 3 + 1) % items.length];
+  return `${a} ${b}`;
+}
+
+function makeProducts(n, offset = 0) {
+  return Array.from({ length: n }).map((_, idx) => {
+    const i = idx + offset;
+    const cat = CATEGORIES[1 + (i % (CATEGORIES.length - 1))];
+    const price = 3500 + ((i * 733) % 18000);
+    const height = 220 + ((i * 97) % 140); // for masonry variety
+    return {
+      id: i,
+      name: seedName(i),
+      category: cat,
+      price,
+      color: PALETTE[i % PALETTE.length],
+      height,
+      size: ["XS", "S", "M", "L", "XL"][i % 5],
+      condition: ["Excellent", "Very Good", "Good"][i % 3],
+    };
+  });
+}
+
+const ALL_PRODUCTS = makeProducts(24);
+
+function formatNaira(n) {
+  return "₦" + n.toLocaleString("en-NG");
+}
+
+function ProductCard({ p, onOpen, onAdd, tall }) {
+  return (
+    <div
+      className="group relative rounded-lg overflow-hidden bg-[#141416] border border-[#2a2a2d] hover:border-[#C9A227] transition-colors duration-300 cursor-pointer"
+      onClick={() => onOpen(p)}
+    >
+      <div
+        className="w-full flex items-end p-3"
+        style={{
+          height: tall ? p.height : 200,
+          background: `linear-gradient(160deg, ${p.color} 0%, #0A0A0C 130%)`,
+        }}
+      >
+        <span className="text-[10px] tracking-[0.15em] uppercase text-[#E8C56B]/80 font-medium">
+          {p.condition}
+        </span>
+      </div>
+      <div className="p-3">
+        <p className="text-[13px] text-[#F3ECDD] font-medium leading-snug">{p.name}</p>
+        <div className="flex items-center justify-between mt-1.5">
+          <span className="text-[#C9A227] text-[13px] font-semibold">{formatNaira(p.price)}</span>
+          <span className="text-[10px] text-[#888]">Size {p.size}</span>
+        </div>
+      </div>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onAdd(p);
+        }}
+        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-[#C9A227] text-[#0A0A0C] text-[11px] font-semibold px-2.5 py-1 rounded-full"
+      >
+        + Add
+      </button>
+    </div>
+  );
+}
+
+export default function ThriftByEugy() {
+  const [category, setCategory] = useState("All");
+  const [cart, setCart] = useState([]);
+  const [cartOpen, setCartOpen] = useState(false);
+  const [quickView, setQuickView] = useState(null);
+  const [query, setQuery] = useState("");
+  const [view, setView] = useState("home"); // home | shop
+
+  const filtered = useMemo(() => {
+    return ALL_PRODUCTS.filter((p) => {
+      const matchCat = category === "All" || p.category === category;
+      const matchQuery = p.name.toLowerCase().includes(query.toLowerCase());
+      return matchCat && matchQuery;
+    });
+  }, [category, query]);
+
+  const recommended = useMemo(() => {
+    // mock AI rec: items from same categories as cart, else fallback random slice
+    if (cart.length === 0) return ALL_PRODUCTS.slice(4, 10);
+    const cats = new Set(cart.map((c) => c.category));
+    return ALL_PRODUCTS.filter((p) => cats.has(p.category) && !cart.find((c) => c.id === p.id)).slice(0, 6);
+  }, [cart]);
+
+  const addToCart = (p) => setCart((c) => [...c, p]);
+  const removeFromCart = (id) =>
+    setCart((c) => {
+      const idx = c.findIndex((i) => i.id === id);
+      if (idx === -1) return c;
+      const copy = [...c];
+      copy.splice(idx, 1);
+      return copy;
+    });
+  const total = cart.reduce((s, p) => s + p.price, 0);
+
+  return (
+    <div className="min-h-screen bg-[#0A0A0C] text-[#F3ECDD]" style={{ fontFamily: "'Inter', sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,500&family=Inter:wght@400;500;600;700&display=swap');
+        .font-display { font-family: 'Playfair Display', serif; }
+      `}</style>
+
+      {/* Top bar */}
+      <div className="bg-[#0A0A0C] border-b border-[#2a2a2d]">
+        <div className="max-w-6xl mx-auto flex items-center justify-between px-5 py-4">
+          <div className="flex items-center gap-6">
+            <span
+              className="font-display italic text-2xl tracking-tight"
+              style={{ color: "#C9A227" }}
+            >
+              Thrift by Eugy
+            </span>
+            <nav className="hidden md:flex gap-5 text-[13px] text-[#cfcfcf]">
+              <button
+                onClick={() => setView("home")}
+                className={`hover:text-[#C9A227] transition-colors ${view === "home" ? "text-[#C9A227]" : ""}`}
+              >
+                Discover
+              </button>
+              <button
+                onClick={() => setView("shop")}
+                className={`hover:text-[#C9A227] transition-colors ${view === "shop" ? "text-[#C9A227]" : ""}`}
+              >
+                Shop
+              </button>
+              <span className="text-[#555]">Sale</span>
+              <span className="text-[#555]">New In</span>
+            </nav>
+          </div>
+          <div className="flex items-center gap-4">
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search exquisite finds..."
+              className="hidden sm:block bg-[#141416] border border-[#2a2a2d] rounded-full px-4 py-1.5 text-[12px] w-52 focus:outline-none focus:border-[#C9A227] placeholder:text-[#666]"
+            />
+            <button
+              onClick={() => setCartOpen(true)}
+              className="relative text-[13px] border border-[#C9A227] text-[#C9A227] rounded-full px-3.5 py-1.5 hover:bg-[#C9A227] hover:text-[#0A0A0C] transition-colors"
+            >
+              Bag ({cart.length})
+            </button>
+          </div>
+        </div>
+        <div className="max-w-6xl mx-auto px-5">{FLOURISH}</div>
+      </div>
+
+      {view === "home" && (
+        <>
+          {/* Hero */}
+          <section className="max-w-6xl mx-auto px-5 pt-12 pb-16 grid md:grid-cols-2 gap-10 items-center">
+            <div>
+              <p className="text-[11px] tracking-[0.25em] uppercase text-[#C9A227] mb-4">
+                Curated Secondhand · Lagos
+              </p>
+              <h1 className="font-display text-4xl md:text-5xl leading-[1.1] mb-5">
+                Exquisite fashion,<br />
+                <span className="italic" style={{ color: "#C9A227" }}>thrifted with intention.</span>
+              </h1>
+              <p className="text-[#b8b8b8] text-[14px] leading-relaxed mb-7 max-w-md">
+                One-of-one pieces, hand-picked and quality-checked. Your home for
+                exquisite fashion at an affordable price.
+              </p>
+              <button
+                onClick={() => setView("shop")}
+                className="bg-[#C9A227] text-[#0A0A0C] font-semibold text-[13px] px-6 py-3 rounded-full hover:bg-[#E8C56B] transition-colors"
+              >
+                Shop the Collection
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {ALL_PRODUCTS.slice(0, 4).map((p) => (
+                <div
+                  key={p.id}
+                  className="rounded-lg"
+                  style={{
+                    height: p.id % 2 === 0 ? 160 : 200,
+                    marginTop: p.id % 2 === 0 ? 24 : 0,
+                    background: `linear-gradient(160deg, ${p.color} 0%, #0A0A0C 130%)`,
+                  }}
+                />
+              ))}
+            </div>
+          </section>
+
+          <div className="max-w-6xl mx-auto px-5">{FLOURISH}</div>
+
+          {/* AI Recommendations */}
+          <section className="max-w-6xl mx-auto px-5 py-10">
+            <div className="flex items-baseline justify-between mb-4">
+              <h2 className="font-display text-xl italic" style={{ color: "#E8C56B" }}>
+                {cart.length ? "Styled for you" : "Trending picks"}
+              </h2>
+              <span className="text-[10px] uppercase tracking-[0.15em] text-[#666]">AI Recommended</span>
+            </div>
+            <div className="flex gap-4 overflow-x-auto pb-2 -mx-1 px-1">
+              {recommended.map((p) => (
+                <div key={p.id} className="min-w-[170px]">
+                  <ProductCard p={p} onOpen={setQuickView} onAdd={addToCart} />
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <div className="max-w-6xl mx-auto px-5">{FLOURISH}</div>
+
+          {/* Pinterest-style discovery masonry */}
+          <section className="max-w-6xl mx-auto px-5 py-10">
+            <h2 className="font-display text-xl italic mb-4" style={{ color: "#E8C56B" }}>
+              Discover
+            </h2>
+            <div className="columns-2 sm:columns-3 md:columns-4 gap-4 [&>*]:mb-4">
+              {ALL_PRODUCTS.map((p) => (
+                <div key={p.id} className="break-inside-avoid">
+                  <ProductCard p={p} onOpen={setQuickView} onAdd={addToCart} tall />
+                </div>
+              ))}
+            </div>
+          </section>
+        </>
+      )}
+
+      {view === "shop" && (
+        <section className="max-w-6xl mx-auto px-5 py-10 grid md:grid-cols-[180px_1fr] gap-8">
+          <aside>
+            <p className="text-[11px] uppercase tracking-[0.15em] text-[#666] mb-3">Category</p>
+            <div className="flex md:flex-col flex-wrap gap-2">
+              {CATEGORIES.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setCategory(c)}
+                  className={`text-left text-[13px] px-3 py-1.5 rounded-full md:rounded md:px-0 md:py-1 transition-colors ${
+                    category === c
+                      ? "text-[#C9A227] border md:border-0 border-[#C9A227] bg-[#141416] md:bg-transparent"
+                      : "text-[#999] border md:border-0 border-[#2a2a2d]"
+                  }`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          </aside>
+          <div>
+            <p className="text-[12px] text-[#666] mb-4">{filtered.length} items</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              {filtered.map((p) => (
+                <ProductCard key={p.id} p={p} onOpen={setQuickView} onAdd={addToCart} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Footer */}
+      <footer className="border-t border-[#2a2a2d] mt-12">
+        <div className="max-w-6xl mx-auto px-5 py-8 flex flex-col sm:flex-row justify-between gap-4 text-[12px] text-[#777]">
+          <span className="font-display italic text-[#C9A227] text-base">Thrift by Eugy</span>
+          <span>@thriftbyeugy · your home for exquisite fashion at an affordable price</span>
+        </div>
+      </footer>
+
+      {/* Quick view modal */}
+      {quickView && (
+        <div
+          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+          onClick={() => setQuickView(null)}
+        >
+          <div
+            className="bg-[#141416] border border-[#2a2a2d] rounded-xl max-w-md w-full overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                height: 260,
+                background: `linear-gradient(160deg, ${quickView.color} 0%, #0A0A0C 130%)`,
+              }}
+            />
+            <div className="p-5">
+              <p className="text-[10px] uppercase tracking-[0.15em] text-[#C9A227] mb-1">
+                {quickView.category}
+              </p>
+              <h3 className="font-display text-xl mb-2">{quickView.name}</h3>
+              <p className="text-[#C9A227] text-lg font-semibold mb-3">{formatNaira(quickView.price)}</p>
+              <p className="text-[12px] text-[#999] mb-4">
+                Condition: {quickView.condition} · Size {quickView.size} · One-of-one piece
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    addToCart(quickView);
+                    setQuickView(null);
+                  }}
+                  className="flex-1 bg-[#C9A227] text-[#0A0A0C] font-semibold text-[13px] py-2.5 rounded-full hover:bg-[#E8C56B] transition-colors"
+                >
+                  Add to Bag
+                </button>
+                <button
+                  onClick={() => setQuickView(null)}
+                  className="px-4 border border-[#2a2a2d] rounded-full text-[13px] text-[#999]"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cart drawer */}
+      {cartOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex justify-end" onClick={() => setCartOpen(false)}>
+          <div
+            className="bg-[#0A0A0C] border-l border-[#2a2a2d] w-full max-w-sm h-full p-5 flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="font-display text-lg italic" style={{ color: "#E8C56B" }}>
+                Your Bag
+              </h3>
+              <button onClick={() => setCartOpen(false)} className="text-[#999] text-sm">
+                Close
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto space-y-3">
+              {cart.length === 0 && <p className="text-[13px] text-[#666]">Your bag is empty.</p>}
+              {cart.map((p, idx) => (
+                <div key={idx} className="flex gap-3 items-center border-b border-[#2a2a2d] pb-3">
+                  <div
+                    className="w-14 h-14 rounded"
+                    style={{ background: `linear-gradient(160deg, ${p.color} 0%, #0A0A0C 130%)` }}
+                  />
+                  <div className="flex-1">
+                    <p className="text-[13px]">{p.name}</p>
+                    <p className="text-[#C9A227] text-[12px]">{formatNaira(p.price)}</p>
+                  </div>
+                  <button onClick={() => removeFromCart(p.id)} className="text-[11px] text-[#777] hover:text-[#C9A227]">
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+            {cart.length > 0 && (
+              <div className="pt-4 border-t border-[#2a2a2d]">
+                <div className="flex justify-between text-[14px] mb-4">
+                  <span>Total</span>
+                  <span className="text-[#C9A227] font-semibold">{formatNaira(total)}</span>
+                </div>
+                <button className="w-full bg-[#C9A227] text-[#0A0A0C] font-semibold text-[13px] py-3 rounded-full hover:bg-[#E8C56B] transition-colors">
+                  Checkout
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
