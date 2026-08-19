@@ -98,6 +98,10 @@ export default function ThriftByEugy() {
   const [quickView, setQuickView] = useState(null);
   const [query, setQuery] = useState("");
   const [view, setView] = useState("home"); // home | shop
+  const [checkoutStep, setCheckoutStep] = useState(0); // 0 = cart, 1 = details, 2 = payment, 3 = confirmed
+  const [shipping, setShipping] = useState({ name: "", phone: "", address: "", city: "" });
+  const [payMethod, setPayMethod] = useState("card");
+  const [orderRef, setOrderRef] = useState(null);
 
   const filtered = useMemo(() => {
     return ALL_PRODUCTS.filter((p) => {
@@ -338,49 +342,213 @@ export default function ThriftByEugy() {
         </div>
       )}
 
-      {/* Cart drawer */}
+      {/* Cart / Checkout drawer */}
       {cartOpen && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex justify-end" onClick={() => setCartOpen(false)}>
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex justify-end"
+          onClick={() => {
+            setCartOpen(false);
+            setCheckoutStep(0);
+          }}
+        >
           <div
             className="bg-[#0A0A0C] border-l border-[#2a2a2d] w-full max-w-sm h-full p-5 flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center mb-5">
-              <h3 className="font-display text-lg italic" style={{ color: "#E8C56B" }}>
-                Your Bag
-              </h3>
-              <button onClick={() => setCartOpen(false)} className="text-[#999] text-sm">
-                Close
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto space-y-3">
-              {cart.length === 0 && <p className="text-[13px] text-[#666]">Your bag is empty.</p>}
-              {cart.map((p, idx) => (
-                <div key={idx} className="flex gap-3 items-center border-b border-[#2a2a2d] pb-3">
-                  <div
-                    className="w-14 h-14 rounded"
-                    style={{ background: `linear-gradient(160deg, ${p.color} 0%, #0A0A0C 130%)` }}
-                  />
-                  <div className="flex-1">
-                    <p className="text-[13px]">{p.name}</p>
-                    <p className="text-[#C9A227] text-[12px]">{formatNaira(p.price)}</p>
-                  </div>
-                  <button onClick={() => removeFromCart(p.id)} className="text-[11px] text-[#777] hover:text-[#C9A227]">
-                    Remove
-                  </button>
-                </div>
+            {/* Step indicator */}
+            <div className="flex items-center gap-1.5 mb-5">
+              {["Bag", "Details", "Payment", "Done"].map((label, i) => (
+                <React.Fragment key={label}>
+                  <span
+                    className={`text-[10px] uppercase tracking-[0.1em] ${
+                      i === checkoutStep ? "text-[#C9A227]" : i < checkoutStep ? "text-[#7a6a30]" : "text-[#444]"
+                    }`}
+                  >
+                    {label}
+                  </span>
+                  {i < 3 && <span className="text-[#333] text-[10px]">—</span>}
+                </React.Fragment>
               ))}
             </div>
-            {cart.length > 0 && (
-              <div className="pt-4 border-t border-[#2a2a2d]">
-                <div className="flex justify-between text-[14px] mb-4">
-                  <span>Total</span>
-                  <span className="text-[#C9A227] font-semibold">{formatNaira(total)}</span>
+
+            {/* Step 0: Bag */}
+            {checkoutStep === 0 && (
+              <>
+                <h3 className="font-display text-lg italic mb-4" style={{ color: "#E8C56B" }}>
+                  Your Bag
+                </h3>
+                <div className="flex-1 overflow-y-auto space-y-3">
+                  {cart.length === 0 && <p className="text-[13px] text-[#666]">Your bag is empty.</p>}
+                  {cart.map((p, idx) => (
+                    <div key={idx} className="flex gap-3 items-center border-b border-[#2a2a2d] pb-3">
+                      <div
+                        className="w-14 h-14 rounded"
+                        style={{ background: `linear-gradient(160deg, ${p.color} 0%, #0A0A0C 130%)` }}
+                      />
+                      <div className="flex-1">
+                        <p className="text-[13px]">{p.name}</p>
+                        <p className="text-[#C9A227] text-[12px]">{formatNaira(p.price)}</p>
+                      </div>
+                      <button
+                        onClick={() => removeFromCart(p.id)}
+                        className="text-[11px] text-[#777] hover:text-[#C9A227]"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
                 </div>
-                <button className="w-full bg-[#C9A227] text-[#0A0A0C] font-semibold text-[13px] py-3 rounded-full hover:bg-[#E8C56B] transition-colors">
-                  Checkout
+                {cart.length > 0 && (
+                  <div className="pt-4 border-t border-[#2a2a2d]">
+                    <div className="flex justify-between text-[14px] mb-4">
+                      <span>Total</span>
+                      <span className="text-[#C9A227] font-semibold">{formatNaira(total)}</span>
+                    </div>
+                    <button
+                      onClick={() => setCheckoutStep(1)}
+                      className="w-full bg-[#C9A227] text-[#0A0A0C] font-semibold text-[13px] py-3 rounded-full hover:bg-[#E8C56B] transition-colors"
+                    >
+                      Checkout
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Step 1: Shipping details */}
+            {checkoutStep === 1 && (
+              <>
+                <h3 className="font-display text-lg italic mb-4" style={{ color: "#E8C56B" }}>
+                  Delivery Details
+                </h3>
+                <div className="flex-1 space-y-3">
+                  {[
+                    { key: "name", label: "Full Name", placeholder: "Eugenia Adeyemi" },
+                    { key: "phone", label: "Phone Number", placeholder: "080X XXX XXXX" },
+                    { key: "address", label: "Delivery Address", placeholder: "Street, Area" },
+                    { key: "city", label: "City", placeholder: "Ikeja, Lagos" },
+                  ].map((f) => (
+                    <div key={f.key}>
+                      <label className="text-[10px] uppercase tracking-[0.1em] text-[#888]">{f.label}</label>
+                      <input
+                        value={shipping[f.key]}
+                        onChange={(e) => setShipping((s) => ({ ...s, [f.key]: e.target.value }))}
+                        placeholder={f.placeholder}
+                        className="w-full mt-1 bg-[#141416] border border-[#2a2a2d] rounded px-3 py-2 text-[13px] focus:outline-none focus:border-[#C9A227] placeholder:text-[#555]"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className="pt-4 border-t border-[#2a2a2d] flex gap-2">
+                  <button
+                    onClick={() => setCheckoutStep(0)}
+                    className="px-4 border border-[#2a2a2d] rounded-full text-[13px] text-[#999]"
+                  >
+                    Back
+                  </button>
+                  <button
+                    disabled={!shipping.name || !shipping.phone || !shipping.address}
+                    onClick={() => setCheckoutStep(2)}
+                    className="flex-1 bg-[#C9A227] disabled:opacity-40 disabled:cursor-not-allowed text-[#0A0A0C] font-semibold text-[13px] py-3 rounded-full hover:bg-[#E8C56B] transition-colors"
+                  >
+                    Continue to Payment
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Step 2: Payment */}
+            {checkoutStep === 2 && (
+              <>
+                <h3 className="font-display text-lg italic mb-4" style={{ color: "#E8C56B" }}>
+                  Payment
+                </h3>
+                <div className="flex-1 space-y-3">
+                  {[
+                    { id: "card", label: "Debit / Credit Card" },
+                    { id: "transfer", label: "Bank Transfer" },
+                    { id: "ussd", label: "USSD" },
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      onClick={() => setPayMethod(m.id)}
+                      className={`w-full text-left px-3.5 py-3 rounded-lg border text-[13px] transition-colors ${
+                        payMethod === m.id
+                          ? "border-[#C9A227] bg-[#141416] text-[#E8C56B]"
+                          : "border-[#2a2a2d] text-[#999]"
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                  <p className="text-[11px] text-[#666] pt-2">
+                    Processed securely via Paystack. This demo does not move real money.
+                  </p>
+                  <div className="flex justify-between text-[14px] pt-3 border-t border-[#2a2a2d]">
+                    <span>Total due</span>
+                    <span className="text-[#C9A227] font-semibold">{formatNaira(total)}</span>
+                  </div>
+                </div>
+                <div className="pt-4 flex gap-2">
+                  <button
+                    onClick={() => setCheckoutStep(1)}
+                    className="px-4 border border-[#2a2a2d] rounded-full text-[13px] text-[#999]"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={() => {
+                      setOrderRef("TBE-" + Math.floor(100000 + Math.random() * 900000));
+                      setCheckoutStep(3);
+                    }}
+                    className="flex-1 bg-[#C9A227] text-[#0A0A0C] font-semibold text-[13px] py-3 rounded-full hover:bg-[#E8C56B] transition-colors"
+                  >
+                    Pay {formatNaira(total)}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Step 3: Confirmation */}
+            {checkoutStep === 3 && (
+              <div className="flex-1 flex flex-col items-center justify-center text-center">
+                <div
+                  className="w-14 h-14 rounded-full flex items-center justify-center mb-4 border"
+                  style={{ borderColor: "#C9A227" }}
+                >
+                  <span style={{ color: "#C9A227", fontSize: 22 }}>✓</span>
+                </div>
+                <h3 className="font-display text-xl italic mb-2" style={{ color: "#E8C56B" }}>
+                  Order Confirmed
+                </h3>
+                <p className="text-[13px] text-[#999] mb-1">Reference: {orderRef}</p>
+                <p className="text-[12px] text-[#666] mb-6 max-w-[220px]">
+                  We'll send delivery updates to {shipping.phone || "your phone"}. Thank you for shopping with
+                  Thrift by Eugy.
+                </p>
+                <button
+                  onClick={() => {
+                    setCart([]);
+                    setCheckoutStep(0);
+                    setCartOpen(false);
+                  }}
+                  className="bg-[#C9A227] text-[#0A0A0C] font-semibold text-[13px] px-6 py-2.5 rounded-full hover:bg-[#E8C56B] transition-colors"
+                >
+                  Continue Shopping
                 </button>
               </div>
+            )}
+
+            {checkoutStep < 3 && (
+              <button
+                onClick={() => {
+                  setCartOpen(false);
+                  setCheckoutStep(0);
+                }}
+                className="text-[11px] text-[#666] mt-3 self-start"
+              >
+                Close
+              </button>
             )}
           </div>
         </div>

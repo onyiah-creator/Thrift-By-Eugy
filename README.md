@@ -9,7 +9,11 @@ Built with React, Vite, and Tailwind CSS.
 - **Home / Discover** — hero, AI-style recommendations, and a Pinterest-style masonry discovery grid
 - **Shop** — category filters and live search
 - **Quick view** — product detail modal with condition, size, and one-of-one notes
-- **Bag** — slide-out cart drawer with running total in naira (₦)
+- **Bag & checkout** — slide-out drawer with a 4-step flow: Bag → Delivery Details → Payment (Card / Bank Transfer / USSD) → Order confirmation with reference number, totals in naira (₦)
+
+## Product import template
+
+`templates/ThriftByEugy_Product_Template.xlsx` is the spreadsheet for cataloguing real inventory. It has a **Products** sheet (SKU, name, category, price, size, condition, color, brand, description, image filenames, quantity, status, date added — with one filled-in example row) and a **Legend & Instructions** sheet explaining each column.
 
 ## Getting started
 
