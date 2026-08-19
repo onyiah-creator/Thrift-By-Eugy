@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { REAL_PRODUCTS } from "./products.js";
 
 // ---- Brand tokens ----
 // ink #0A0A0C, gold #C9A227, gold-light #E8C56B, ivory #F3ECDD, burgundy #5C1A2B
@@ -48,7 +49,7 @@ function makeProducts(n, offset = 0) {
   });
 }
 
-const ALL_PRODUCTS = makeProducts(24);
+const ALL_PRODUCTS = [...REAL_PRODUCTS, ...makeProducts(24)];
 
 function formatNaira(n) {
   return "₦" + n.toLocaleString("en-NG");
@@ -61,13 +62,21 @@ function ProductCard({ p, onOpen, onAdd, tall }) {
       onClick={() => onOpen(p)}
     >
       <div
-        className="w-full flex items-end p-3"
+        className="relative w-full flex items-end p-3"
         style={{
           height: tall ? p.height : 200,
           background: `linear-gradient(160deg, ${p.color} 0%, #0A0A0C 130%)`,
         }}
       >
-        <span className="text-[10px] tracking-[0.15em] uppercase text-[#E8C56B]/80 font-medium">
+        {p.image && (
+          <img
+            src={p.image}
+            alt={p.name}
+            loading="lazy"
+            className="absolute inset-0 w-full h-full object-contain p-2"
+          />
+        )}
+        <span className="relative z-10 text-[10px] tracking-[0.15em] uppercase text-[#E8C56B]/80 font-medium">
           {p.condition}
         </span>
       </div>
@@ -205,16 +214,24 @@ export default function ThriftByEugy() {
               </button>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              {ALL_PRODUCTS.slice(0, 4).map((p) => (
+              {ALL_PRODUCTS.slice(0, 4).map((p, i) => (
                 <div
                   key={p.id}
-                  className="rounded-lg"
+                  className="relative rounded-lg overflow-hidden"
                   style={{
-                    height: p.id % 2 === 0 ? 160 : 200,
-                    marginTop: p.id % 2 === 0 ? 24 : 0,
+                    height: i % 2 === 0 ? 160 : 200,
+                    marginTop: i % 2 === 0 ? 24 : 0,
                     background: `linear-gradient(160deg, ${p.color} 0%, #0A0A0C 130%)`,
                   }}
-                />
+                >
+                  {p.image && (
+                    <img
+                      src={p.image}
+                      alt={p.name}
+                      className="absolute inset-0 w-full h-full object-contain p-2"
+                    />
+                  )}
+                </div>
               ))}
             </div>
           </section>
@@ -306,17 +323,29 @@ export default function ThriftByEugy() {
             onClick={(e) => e.stopPropagation()}
           >
             <div
+              className="relative"
               style={{
                 height: 260,
                 background: `linear-gradient(160deg, ${quickView.color} 0%, #0A0A0C 130%)`,
               }}
-            />
+            >
+              {quickView.image && (
+                <img
+                  src={quickView.image}
+                  alt={quickView.name}
+                  className="absolute inset-0 w-full h-full object-contain p-3"
+                />
+              )}
+            </div>
             <div className="p-5">
               <p className="text-[10px] uppercase tracking-[0.15em] text-[#C9A227] mb-1">
                 {quickView.category}
               </p>
               <h3 className="font-display text-xl mb-2">{quickView.name}</h3>
               <p className="text-[#C9A227] text-lg font-semibold mb-3">{formatNaira(quickView.price)}</p>
+              {quickView.description && (
+                <p className="text-[12px] text-[#b8b8b8] leading-relaxed mb-3">{quickView.description}</p>
+              )}
               <p className="text-[12px] text-[#999] mb-4">
                 Condition: {quickView.condition} · Size {quickView.size} · One-of-one piece
               </p>
@@ -382,9 +411,17 @@ export default function ThriftByEugy() {
                   {cart.map((p, idx) => (
                     <div key={idx} className="flex gap-3 items-center border-b border-[#2a2a2d] pb-3">
                       <div
-                        className="w-14 h-14 rounded"
+                        className="relative w-14 h-14 rounded overflow-hidden shrink-0"
                         style={{ background: `linear-gradient(160deg, ${p.color} 0%, #0A0A0C 130%)` }}
-                      />
+                      >
+                        {p.image && (
+                          <img
+                            src={p.image}
+                            alt={p.name}
+                            className="absolute inset-0 w-full h-full object-contain"
+                          />
+                        )}
+                      </div>
                       <div className="flex-1">
                         <p className="text-[13px]">{p.name}</p>
                         <p className="text-[#C9A227] text-[12px]">{formatNaira(p.price)}</p>
