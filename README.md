@@ -30,7 +30,7 @@ A gold **☰ button (bottom-right)** switches between every prototype — a revi
 
 ## Brand
 
-`src/BrandLogo.jsx` provides the TE monogram crest and the monogram + wordmark lockup as crisp inline SVGs (vector renditions of the official logo), used in the storefront header/footer, the admin panel, the order confirmation, and as the favicon (`public/favicon.svg`).
+The official logo artwork lives in `public/brand/` — `crest.png` (the laurel TE crest) and `wordmark.png` (the script wordmark) — used by the storefront's header lockup, footer, and order confirmation. The artwork is gold, so it always sits on ink-colored bars; on the light body, gold text uses `GOLD_DEEP` (#8A6E14) for contrast, per the note at the top of `src/Storefront.jsx`. `src/BrandLogo.jsx` additionally provides crisp inline-SVG monogram renditions used in the dark-themed views (classic storefront, admin, Recommender Lab) and the favicon (`public/favicon.svg`).
 
 ## Admin panel
 
