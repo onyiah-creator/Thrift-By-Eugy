@@ -49,17 +49,32 @@ function Wordmark({ onClick, compact }) {
   // Crest and script wordmark side by side, separated by a gold hairline.
   // Both are gold artwork, so this lockup lives on the ink bar where the
   // brand gold has proper contrast — never on the white body.
-  const crestH = compact ? 38 : 52;
-  const wmH = compact ? 22 : 30;
+  //
+  // Sizing is responsive via CSS classes rather than fixed px: at full desktop
+  // size the lockup is ~360px wide, which overflows a phone viewport once the
+  // menu, saved and bag controls are added alongside it. min-w-0 lets it
+  // shrink rather than forcing the page into horizontal scroll.
+  const crest = compact ? "h-[34px]" : "h-[28px] min-[400px]:h-[34px] sm:h-[44px] lg:h-[52px]";
+  const wm = compact ? "h-[20px]" : "h-[16px] min-[400px]:h-[19px] sm:h-[25px] lg:h-[30px]";
+  const rule = compact ? "h-[20px]" : "h-[17px] min-[400px]:h-[20px] sm:h-[26px] lg:h-[32px]";
+
   return (
-    <button onClick={onClick} className="flex items-center shrink-0" aria-label="Thrift by Eugy — home">
-      <img src={CREST} alt="" style={{ height: crestH, width: "auto" }} className="block" />
+    <button
+      onClick={onClick}
+      className="flex items-center min-w-0 shrink"
+      aria-label="Thrift by Eugy — home"
+    >
+      <img src={CREST} alt="" className={`block w-auto shrink-0 ${crest}`} />
       <span
         aria-hidden="true"
-        className="mx-3 sm:mx-4 block"
-        style={{ width: 1, height: crestH * 0.62, background: "linear-gradient(transparent, rgba(201,162,39,0.55), transparent)" }}
+        className={`block shrink-0 mx-1.5 min-[400px]:mx-2 sm:mx-3 lg:mx-4 ${rule}`}
+        style={{ width: 1, background: "linear-gradient(transparent, rgba(201,162,39,0.55), transparent)" }}
       />
-      <img src={WORDMARK} alt="Thrift by Eugy" style={{ height: wmH, width: "auto" }} className="block" />
+      <img
+        src={WORDMARK}
+        alt="Thrift by Eugy"
+        className={`block w-auto max-w-full ${wm}`}
+      />
     </button>
   );
 }
@@ -99,7 +114,10 @@ function Card({ p, onOpen, onSave, saved, tall }) {
       </div>
 
       <div className="pt-2">
-        <p className="text-[12px] leading-snug line-clamp-2" style={{ color: INK }}>{p.name}</p>
+        {/* Fixed two-line slot: without it a one-line title and a two-line
+            title push their prices to different heights, and the grid rows
+            visibly misalign. */}
+        <p className="text-[12px] leading-snug line-clamp-2 min-h-[2.4em]" style={{ color: INK }}>{p.name}</p>
         <p className="text-[14px] font-semibold mt-1" style={{ color: INK }}>{naira(p.price)}</p>
         <p className="text-[10.5px] mt-0.5" style={{ color: INK_SOFT }}>
           Size {p.size} · {p.condition} · 1 left
@@ -167,7 +185,7 @@ export default function Storefront() {
   const goCat = (c) => { setCategory(c); setView("shop"); setActiveEdit(null); setMenuOpen(false); };
 
   return (
-    <div className="min-h-screen" style={{ background: WHITE, color: INK, fontFamily: "Inter, sans-serif" }}>
+    <div className="min-h-screen overflow-x-hidden" style={{ background: WHITE, color: INK, fontFamily: "Inter, sans-serif" }}>
       {/* ---------------- NAV ---------------- */}
       {/* Utility bar — dark strip keeps a trace of the brand's ink identity
           and carries the terms, mirroring how FN anchors promo info up top. */}
@@ -177,8 +195,8 @@ export default function Storefront() {
 
       <header className="sticky top-0 z-30" style={{ background: INK }}>
         {/* Row 1 — logo, search, actions */}
-        <div className="max-w-6xl mx-auto px-4 h-[84px] flex items-center gap-4">
-          <button onClick={() => setMenuOpen(true)} className="md:hidden text-[19px] leading-none" style={{ color: "#E8E4DC" }} aria-label="Open menu">
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 h-[60px] sm:h-[72px] lg:h-[84px] flex items-center gap-2 sm:gap-4">
+          <button onClick={() => setMenuOpen(true)} className="md:hidden text-[19px] leading-none shrink-0 pr-1" style={{ color: "#E8E4DC" }} aria-label="Open menu">
             &#9776;
           </button>
 
@@ -197,11 +215,11 @@ export default function Storefront() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4 ml-auto">
+          <div className="flex items-center gap-2 min-[400px]:gap-3 sm:gap-4 ml-auto shrink-0">
             <button onClick={() => setSizeGuide(true)} className="hidden lg:block text-[12px]" style={{ color: "#A8A49C" }}>
               Size Guide
             </button>
-            <button onClick={() => setSavedOpen(true)} className="relative text-[17px] leading-none" aria-label="Saved" style={{ color: saved.length ? "#E8646B" : "#E8E4DC" }}>
+            <button onClick={() => setSavedOpen(true)} className="relative text-[17px] leading-none shrink-0" aria-label="Saved" style={{ color: saved.length ? "#E8646B" : "#E8E4DC" }}>
               {saved.length ? "\u2665" : "\u2661"}
               {saved.length > 0 && (
                 <span className="absolute -top-1.5 -right-2 text-[9px] rounded-full w-4 h-4 flex items-center justify-center" style={{ background: INK, color: WHITE }}>
@@ -211,7 +229,7 @@ export default function Storefront() {
             </button>
             <button
               onClick={() => setCartOpen(true)}
-              className="text-[12px] font-medium rounded-full px-4 py-2"
+              className="text-[10.5px] min-[400px]:text-[11px] sm:text-[12px] font-medium rounded-full px-2.5 min-[400px]:px-3 sm:px-4 py-1.5 sm:py-2 whitespace-nowrap shrink-0"
               style={{ background: GOLD, color: INK }}
             >
               Bag ({cart.length})
