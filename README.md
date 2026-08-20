@@ -8,6 +8,8 @@ Built with React, Vite, and Tailwind CSS.
 
 The default storefront (`src/Storefront.jsx`) adapts patterns from Fashion Nova, Shein, and Pinterest with thrift-appropriate changes — see [docs/DESIGN_REFERENCES.md](docs/DESIGN_REFERENCES.md) for what was taken and what was deliberately not (no countdown timers, no fake %-off badges).
 
+It uses an editorial **light theme**: garments read better against white, and a white product background is what Google Merchant Center prefers. Because the brand gold `#C9A227` only scores 2.42:1 against white, gold is split into two roles — `#C9A227` for fills, buttons, and rules (never text on white) and `#8A6E14` for gold-coloured text (4.86:1, passes WCAG AA); body copy is carried by ink.
+
 - **The Edit** — named curated collections (Owambe Ready, The Lagos Workweek, Denim Broken In, Quiet Luxury)
 - **Tabbed rail** — For You (recommendation engine) / New In / Dresses / Under ₦10k
 - **Wishlist & recently viewed** — with the explicit note that saving doesn't reserve a one-of-one piece
@@ -26,11 +28,10 @@ A gold **☰ button (bottom-right)** switches between every prototype — a revi
 | `#/spin` | 360° spin viewer demo |
 | `#/admin` | Add Product admin panel |
 | `#/recommender` | Recommender Lab — the suggestion engine made visible |
-| `#/classic` | Original storefront layout |
 
 ## Brand
 
-`src/BrandLogo.jsx` provides the TE monogram crest and the monogram + wordmark lockup as crisp inline SVGs (vector renditions of the official logo), used in the storefront header/footer, the admin panel, the order confirmation, and as the favicon (`public/favicon.svg`).
+`src/assets/crest.png` is the official crest, used in the storefront header/footer wordmark. `src/BrandLogo.jsx` provides the TE monogram crest and the monogram + wordmark lockup as crisp inline SVGs (vector renditions of the official logo), used in the admin panel, the order confirmation, and as the favicon (`public/favicon.svg`).
 
 ## Admin panel
 
