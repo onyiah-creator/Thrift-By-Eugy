@@ -44,6 +44,21 @@ Open `#/admin` (e.g. http://localhost:5173/#/admin) for the **Add Product** page
 
 `src/SpinViewer.jsx` exports `SpinViewer`, a drag-to-rotate frame viewer (mouse, touch, arrow keys, scrub bar, auto-spin, full preload). Try the interaction at `#/spin`, which renders generated placeholder frames. Real spins are shot on the mannequin at fixed intervals and prepared with `scripts/prep_spin.py` — it applies one shared crop box across all frames so the garment doesn't jitter (photos go in `spin_raw/<SKU>/` next to the script; output lands in `spin_out/<SKU>/` with a manifest). See [docs/SPIN_GUIDE.md](docs/SPIN_GUIDE.md) for the shooting checklist and why frames beat GIF/video.
 
+## Checkout & inventory backend
+
+`worker/worker-checkout.js` + `worker/schema.sql` (Cloudflare Worker + D1) handle the one-of-one race: reservations are claimed with a single conditional `UPDATE` (never read-then-write), orders only become `paid` through the signature-verified Paystack webhook, duplicate webhooks are rejected by primary key, and a cron sweep releases expired 15-minute holds. Amounts are stored in whole naira and converted to kobo at the Paystack boundary; prices always come from the database, never the client.
+
+Prove the race logic any time it changes:
+
+```bash
+python3 scripts/test_race.py    # 8 concurrent shoppers, 1 item → exactly 1 winner
+python3 scripts/test_flows.py   # 9 reservation/webhook/expiry flow tests
+```
+
+See [docs/CHECKOUT_GUIDE.md](docs/CHECKOUT_GUIDE.md) for the flow, Paystack setup, and the five things that will bite if changed.
+
+> **Preview note:** `public/robots.txt` and a `noindex` meta currently keep the demo catalogue out of search engines. Remove both when the real catalogue and checkout go live.
+
 ## Recommendations
 
 `src/recommender.js` is a thrift-aware recommendation engine: content similarity (category, colour family, price band, size, style keywords, condition) blended with an attribute-level behaviour model whose weight grows as browsing events accumulate — no cold-start hole, and sold items are never recommended. The storefront uses it live: the home strip is `trending` for new visitors and `forYou` once the bag has items, and the quick-view modal shows `completeTheLook` picks from complementary categories. `worker/worker-recommendations.js` exposes the same engine as an API (`/api/recommendations/*`, `POST /api/events`) backed by D1 + KV. Run the test suite with `npm test`; see [docs/RECOMMENDATIONS_GUIDE.md](docs/RECOMMENDATIONS_GUIDE.md) for design rationale and tuning notes.

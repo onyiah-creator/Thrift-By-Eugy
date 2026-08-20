@@ -1,0 +1,4 @@
+# Preview deployment — demo data, not a real storefront.
+# Remove this file when the real catalogue and checkout go live.
+User-agent: *
+Disallow: /
