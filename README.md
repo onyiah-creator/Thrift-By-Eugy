@@ -18,12 +18,15 @@ The default storefront (`src/Storefront.jsx`) adapts patterns from Fashion Nova,
 
 ### Routes
 
+A gold **☰ button (bottom-right)** switches between every prototype — a review tool only; in production the storefront is the root route and admin moves behind authentication.
+
 | Hash | Page |
 | --- | --- |
-| `/` | Storefront (default) |
-| `#/classic` | Original storefront layout |
-| `#/admin` | Add Product admin panel |
+| `/` or `#/storefront` | Storefront (default) |
 | `#/spin` | 360° spin viewer demo |
+| `#/admin` | Add Product admin panel |
+| `#/recommender` | Recommender Lab — the suggestion engine made visible |
+| `#/classic` | Original storefront layout |
 
 ## Brand
 
@@ -66,6 +69,23 @@ npm run dev
 ```
 
 Then open the URL Vite prints (defaults to http://localhost:5173).
+
+## Deploying to Cloudflare Pages
+
+**Option A — Git (recommended):** in the Cloudflare dashboard, *Workers & Pages → Create → Pages → Connect to Git*, pick this repo, framework preset **Vite**, build command `npm run build`, output directory `dist`, Node 18+. Every push redeploys automatically and PRs get preview URLs.
+
+**Option B — direct upload:**
+
+```bash
+npm run build
+npx wrangler pages deploy dist --project-name=thrift-by-eugy
+```
+
+**Custom domain:** in the Pages project, *Custom domains → Set up a domain* → `thriftbyeugy.com`. With nameservers on Cloudflare, DNS and SSL are automatic.
+
+Included config: `public/_redirects` (SPA routing), `public/_headers` (immutable asset caching + security headers), `wrangler.toml` (Pages project config).
+
+**This deploys the frontend only**, running on demo data. Not yet connected: D1 database (products are hardcoded), R2 image storage, Paystack (checkout is a mock), and the recommendation / image / Merchant Center Workers in `worker/` — those deploy separately.
 
 ## Scripts
 
