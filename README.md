@@ -44,15 +44,32 @@ Open `#/admin` (e.g. http://localhost:5173/#/admin) for the **Add Product** page
 
 `src/SpinViewer.jsx` exports `SpinViewer`, a drag-to-rotate frame viewer (mouse, touch, arrow keys, scrub bar, auto-spin, full preload). Try the interaction at `#/spin`, which renders generated placeholder frames. Real spins are shot on the mannequin at fixed intervals and prepared with `scripts/prep_spin.py` — it applies one shared crop box across all frames so the garment doesn't jitter (photos go in `spin_raw/<SKU>/` next to the script; output lands in `spin_out/<SKU>/` with a manifest). See [docs/SPIN_GUIDE.md](docs/SPIN_GUIDE.md) for the shooting checklist and why frames beat GIF/video.
 
+## Products & admin API
+
+`worker/worker-api.js` (config: `worker/wrangler-api.toml`) is the read/write layer the storefront and admin panel need. Public routes (`GET /api/products`, `GET /api/products/:sku`) only ever return `status='active'` stock, so drafts and sold pieces can't be reached by guessing a URL — though a single sold item still resolves with `available: false`, because links to sold one-of-one pieces get shared constantly and "this one's gone, here's what's similar" beats a 404.
+
+Admin routes (`/api/admin/*` — products CRUD, orders, stats) require a bearer token, compared in constant time, and **fail closed**: with no `ADMIN_TOKEN` configured they return 503 rather than allowing access. Deleting archives rather than hard-deletes (orders reference SKUs and must stay readable), reserved items can't be edited mid-checkout (409), and placeholder brands like "N/A" or "Unbranded" are normalised to null on entry so the Merchant Center feed never has to guess.
+
+```bash
+cd worker
+wrangler secret put ADMIN_TOKEN          # long and random; store in a password manager
+wrangler deploy --config wrangler-api.toml
+```
+
+The test that matters after deploying: `curl https://<api-url>/api/admin/products` with **no** token must return 401. See [docs/API_GUIDE.md](docs/API_GUIDE.md).
+
+> ⚠️ **The admin panel at `#/admin` still has no authentication.** That is harmless while it's a mock, but it must not be wired to these write endpoints until it holds the token behind a login (or sits behind Cloudflare Access).
+
 ## Checkout & inventory backend
 
 `worker/worker-checkout.js` + `worker/schema.sql` (Cloudflare Worker + D1) handle the one-of-one race: reservations are claimed with a single conditional `UPDATE` (never read-then-write), orders only become `paid` through the signature-verified Paystack webhook, duplicate webhooks are rejected by primary key, and a cron sweep releases expired 15-minute holds. Amounts are stored in whole naira and converted to kobo at the Paystack boundary; prices always come from the database, never the client.
 
-Prove the race logic any time it changes:
+Prove the race logic any time it changes — `npm run test:backend` runs all three backend suites against the real schema:
 
 ```bash
 python3 scripts/test_race.py    # 8 concurrent shoppers, 1 item → exactly 1 winner
 python3 scripts/test_flows.py   # 9 reservation/webhook/expiry flow tests
+python3 scripts/test_api.py     # 9 API SQL/visibility tests
 ```
 
 See [docs/CHECKOUT_GUIDE.md](docs/CHECKOUT_GUIDE.md) for the flow, Paystack setup, and the five things that will bite if changed.

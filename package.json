@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node src/recommender.test.js"
+    "test": "node src/recommender.test.js",
+    "test:backend": "python3 scripts/test_race.py && python3 scripts/test_flows.py && python3 scripts/test_api.py"
   },
   "dependencies": {
     "react": "^18.3.1",
