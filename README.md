@@ -64,17 +64,17 @@ Everything is created as a **draft** — nothing goes live until you have seen i
 
 ## Products & admin API
 
-`worker/worker-api.js` (config: `worker/wrangler-api.toml`) is the read/write layer the storefront and admin panel need. Public routes (`GET /api/products`, `GET /api/products/:sku`) only ever return `status='active'` stock, so drafts and sold pieces can't be reached by guessing a URL — though a single sold item still resolves with `available: false`, because links to sold one-of-one pieces get shared constantly and "this one's gone, here's what's similar" beats a 404.
+`api/worker-api.js` (config: `api/wrangler.toml`) is the read/write layer the storefront and admin panel need. Public routes (`GET /api/products`, `GET /api/products/:sku`) only ever return `status='active'` stock, so drafts and sold pieces can't be reached by guessing a URL — though a single sold item still resolves with `available: false`, because links to sold one-of-one pieces get shared constantly and "this one's gone, here's what's similar" beats a 404.
 
 Admin routes (`/api/admin/*` — products CRUD, orders, stats) require a bearer token, compared in constant time, and **fail closed**: with no `ADMIN_TOKEN` configured they return 503 rather than allowing access. Deleting archives rather than hard-deletes (orders reference SKUs and must stay readable), reserved items can't be edited mid-checkout (409), and placeholder brands like "N/A" or "Unbranded" are normalised to null on entry so the Merchant Center feed never has to guess.
 
 ```bash
-cd worker
+cd api
 wrangler secret put ADMIN_TOKEN          # long and random; store in a password manager
-wrangler deploy --config wrangler-api.toml
+wrangler deploy
 ```
 
-Each Worker in `worker/` has its own config: `wrangler.toml` is the deployed checkout Worker (the default target of a bare `wrangler deploy` in that directory), `wrangler-api.toml` is this products/admin API, and `wrangler-images.toml.example` is the template for the image pipeline. Deploy a non-default one with `--config <file>`.
+The products/admin API deploys from `api/`, which has its own `wrangler.toml`. The other Workers live in `worker/`, where `wrangler.toml` is the deployed checkout Worker and `wrangler-images.toml.example` is the image pipeline template (deploy a non-default config with `--config <file>`). The shared D1 schema is `worker/schema.sql`.
 
 The test that matters after deploying: `curl https://<api-url>/api/admin/products` with **no** token must return 401. See [docs/API_GUIDE.md](docs/API_GUIDE.md).
 
