@@ -1,0 +1,14 @@
+name = "thriftbyeugy-checkout"
+main = "worker-checkout.js"
+compatibility_date = "2026-08-20"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "thriftbyeugy"
+database_id = "d15a3fb2-fc60-4cf2-a39f-d96703060bde"
+
+[vars]
+SITE_ORIGIN = "https://thrift-by-eugy.pages.dev"
+
+[triggers]
+crons = ["*/5 * * * *"]
