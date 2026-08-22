@@ -21,9 +21,9 @@ export const REAL_PRODUCTS = [
   {
     id: "TBE-0002",
     sku: "TBE-0002",
-    name: "Lime Ruffle Crop Top",
+    name: "Lime Ruffle Wrap Blouse",
     category: "Tops",
-    price: 7500,
+    price: 9800,
     color: "#5C8A2F",
     height: 300,
     size: "S",
