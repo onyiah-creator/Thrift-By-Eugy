@@ -38,7 +38,7 @@ Open `#/admin` (e.g. http://localhost:5173/#/admin) for the **Add Product** page
 
 ## Image pipeline
 
-`worker/worker-images.js` is the Cloudflare Worker that backs the admin upload flow: it stores one full-quality master per photo in R2 and serves resized AVIF/WebP/JPEG variants (thumb/card/detail/zoom) via content negotiation, with EXIF stripped on delivery. `worker/wrangler.toml.example` shows the required bindings; see [docs/IMAGE_GUIDE.md](docs/IMAGE_GUIDE.md) for the full guide, including the one open decision (where background removal runs: Cloudflare Workers AI vs. a small rembg container).
+`worker/worker-images.js` is the Cloudflare Worker that backs the admin upload flow: it stores one full-quality master per photo in R2 and serves resized AVIF/WebP/JPEG variants (thumb/card/detail/zoom) via content negotiation, with EXIF stripped on delivery. `worker/wrangler-images.toml.example` shows the required bindings; see [docs/IMAGE_GUIDE.md](docs/IMAGE_GUIDE.md) for the full guide, including the one open decision (where background removal runs: Cloudflare Workers AI vs. a small rembg container).
 
 ## 360° spin viewer
 
@@ -55,6 +55,8 @@ cd worker
 wrangler secret put ADMIN_TOKEN          # long and random; store in a password manager
 wrangler deploy --config wrangler-api.toml
 ```
+
+Each Worker in `worker/` has its own config: `wrangler.toml` is the deployed checkout Worker (the default target of a bare `wrangler deploy` in that directory), `wrangler-api.toml` is this products/admin API, and `wrangler-images.toml.example` is the template for the image pipeline. Deploy a non-default one with `--config <file>`.
 
 The test that matters after deploying: `curl https://<api-url>/api/admin/products` with **no** token must return 401. See [docs/API_GUIDE.md](docs/API_GUIDE.md).
 
