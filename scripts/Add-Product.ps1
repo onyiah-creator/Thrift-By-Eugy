@@ -1,5 +1,5 @@
-<#
-    Thrift by Eugy — add products from PowerShell
+﻿<#
+    Thrift by Eugy - add products from PowerShell
 
     The admin panel isn't wired to the API yet, so this talks to the API
     directly. Products added this way are REAL: they live in D1, and once the
@@ -108,7 +108,7 @@ function Add-One($body) {
     try {
         $json = $body | ConvertTo-Json -Depth 5
         $r = Invoke-RestMethod -Uri "$api/api/admin/products" -Method Post -Headers $headers -Body $json
-        Write-Host "  Added $($body.sku) — $($body.name)" -ForegroundColor Green
+        Write-Host "  Added $($body.sku) - $($body.name)" -ForegroundColor Green
         return $true
     } catch {
         $msg = $_.ErrorDetails.Message
@@ -184,7 +184,7 @@ function Add-Interactive {
 
     $color = Read-Host "`nColour (e.g. Coral)"
     $brand = Read-Host "Brand (Enter to skip if unlabeled)"
-    $desc  = Read-Host "Description — fabric, fit, any flaws"
+    $desc  = Read-Host "Description - fabric, fit, any flaws"
 
     $body = @{
         sku             = $sku

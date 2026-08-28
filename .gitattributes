@@ -1,0 +1,8 @@
+# PowerShell scripts are run on Windows: keep CRLF line endings on checkout so
+# Windows PowerShell parses them cleanly regardless of the cloning platform.
+# (The files are also saved UTF-8 *with BOM*, without which Windows PowerShell
+# 5.1 reads them as ANSI and mangles any non-ASCII character.)
+*.ps1 text eol=crlf
+
+# Keep CSV imports predictable for PowerShell's Import-Csv.
+*.csv text eol=crlf

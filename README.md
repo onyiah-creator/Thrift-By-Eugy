@@ -60,6 +60,8 @@ $env:TBE_API   = "https://thriftbyeugy-api.onyiah.workers.dev"
 
 Everything is created as a **draft** — nothing goes live until you have seen it listed. SKUs auto-continue the `TBE-####` sequence, and the token is read from an environment variable so it never lands in the repo.
 
+The script is saved UTF-8 **with BOM** and CRLF line endings, and `.gitattributes` keeps it that way on checkout — without the BOM, Windows PowerShell 5.1 reads it as ANSI and mangles non-ASCII characters.
+
 `templates/products-template.csv` is the bulk-import format (the richer `templates/ThriftByEugy_Product_Template.xlsx` remains the full cataloguing sheet, including image filenames).
 
 ## Products & admin API
