@@ -41,11 +41,31 @@ export default {
       return cors(await handleUpload(request, env), env);
     }
     if (url.pathname.startsWith("/img/")) {
-      return handleDeliver(request, env, url);
+      return handleDeliver(request, env, url, ctx);
+    }
+    if (url.pathname.startsWith("/_raw/")) {
+      return handleRaw(env, url);
     }
     return new Response("Not found", { status: 404 });
   },
 };
+
+/**
+ * Internal-only: serves the exact R2 bytes with no transformation.
+ * This exists so handleDeliver has something DIFFERENT to point Cloudflare's
+ * image resizer at. Pointing the resizer at the same public /img/ URL that
+ * handleDeliver itself serves would recurse into this same function forever
+ * (or, worse, silently skip resizing) — it needs a distinct origin URL to
+ * fetch and transform, exactly like fetching a normal image off the web.
+ */
+async function handleRaw(env, url) {
+  const [, , sku, index] = url.pathname.split("/");
+  const object = await env.PRODUCT_IMAGES.get(`products/${sku}/${index}.master`);
+  if (!object) return new Response("Not found", { status: 404 });
+  return new Response(object.body, {
+    headers: { "Content-Type": object.httpMetadata?.contentType || "application/octet-stream" },
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Upload: admin posts the raw photo + the processing choice
@@ -73,14 +93,23 @@ async function handleUpload(request, env) {
   let meta = { processing, cutout: false };
 
   if (processing === "auto") {
-    try {
-      const cleaned = await runCutout(bytes, file.type, env);
-      bytes = cleaned.bytes;
-      meta = { ...meta, ...cleaned.meta, cutout: true };
-    } catch (err) {
-      // Never lose the upload because cleanup failed — store the original
-      // and tell the admin, so they can retry or keep it as shot.
-      meta.cutoutError = String(err.message || err);
+    if (!env.CUTOUT_SERVICE_URL) {
+      // The background-removal service (Workers AI or a rembg container) is
+      // not deployed yet — this is a known, expected gap, not a fault. Skip
+      // the network attempt entirely rather than throwing a confusing error,
+      // and say so plainly so the admin isn't left guessing why nothing
+      // changed about the photo.
+      meta.cutoutError = "not_configured";
+    } else {
+      try {
+        const cleaned = await runCutout(bytes, file.type, env);
+        bytes = cleaned.bytes;
+        meta = { ...meta, ...cleaned.meta, cutout: true };
+      } catch (err) {
+        // Never lose the upload because cleanup failed — store the original
+        // and tell the admin, so they can retry or keep it as shot.
+        meta.cutoutError = String(err.message || err);
+      }
     }
   }
 
@@ -111,9 +140,12 @@ async function handleUpload(request, env) {
     urls: Object.fromEntries(
       Object.keys(VARIANTS).map((v) => [v, `/img/${sku}/${index}/${v}`])
     ),
-    note: meta.cutoutError
-      ? "Saved as shot — automatic cleanup didn't run on this photo."
-      : undefined,
+    note:
+      meta.cutoutError === "not_configured"
+        ? "Saved as shot — automatic background cleanup isn't turned on yet. Photo was still compressed and optimised."
+        : meta.cutoutError
+        ? "Saved as shot — automatic cleanup didn't run on this photo. Photo was still compressed and optimised."
+        : undefined,
   });
 }
 
@@ -157,7 +189,7 @@ async function runCutout(bytes, contentType, env) {
 // One stored master -> AVIF, WebP, or JPEG depending on what the shopper's
 // browser accepts. Smaller file, identical visible quality.
 // ---------------------------------------------------------------------------
-async function handleDeliver(request, env, url) {
+async function handleDeliver(request, env, url, ctx) {
   const [, , sku, index, variantName] = url.pathname.split("/");
   const variant = VARIANTS[variantName] || VARIANTS.card;
 
@@ -166,13 +198,16 @@ async function handleDeliver(request, env, url) {
   const hit = await cache.match(cacheKey);
   if (hit) return hit;
 
-  const object = await env.PRODUCT_IMAGES.get(`products/${sku}/${index}.master`);
-  if (!object) return new Response("Image not found", { status: 404 });
+  const exists = await env.PRODUCT_IMAGES.head(`products/${sku}/${index}.master`);
+  if (!exists) return new Response("Image not found", { status: 404 });
 
   const format = pickFormat(request);
 
-  // cf.image runs Cloudflare's resizing/encoding at the edge.
-  const response = await fetch(new Request(url.toString()), {
+  // Point the resizer at the internal /_raw/ origin, NOT this same /img/ URL —
+  // fetching the URL this function itself handles would recurse forever
+  // instead of ever reaching real image bytes.
+  const rawUrl = new URL(`/_raw/${sku}/${index}`, url.origin);
+  const response = await fetch(rawUrl, {
     cf: {
       image: {
         width: variant.width,
@@ -184,7 +219,20 @@ async function handleDeliver(request, env, url) {
     },
   });
 
-  const out = new Response(object.body, {
+  if (!response.ok) {
+    // Resizing failed for some reason (e.g. Image Resizing not enabled on
+    // this zone yet) — fall back to the untouched original rather than a
+    // broken image. Slower and heavier, but a visible product beats none.
+    const fallback = await env.PRODUCT_IMAGES.get(`products/${sku}/${index}.master`);
+    return new Response(fallback.body, {
+      headers: {
+        "Content-Type": fallback.httpMetadata?.contentType || "application/octet-stream",
+        "Cache-Control": "public, max-age=3600",
+      },
+    });
+  }
+
+  const out = new Response(response.body, {
     headers: {
       "Content-Type": `image/${format === "baseline-jpeg" ? "jpeg" : format}`,
       // Immutable: filenames are versioned by SKU+index, so a changed photo
@@ -194,7 +242,7 @@ async function handleDeliver(request, env, url) {
     },
   });
 
-  ctxWaitUntil(cache.put(cacheKey, out.clone()));
+  ctx.waitUntil(cache.put(cacheKey, out.clone()));
   return out;
 }
 
@@ -210,11 +258,31 @@ function pickFormat(request) {
 // Helpers
 // ---------------------------------------------------------------------------
 async function requireAdmin(request, env) {
-  const token = (request.headers.get("Authorization") || "").replace("Bearer ", "");
-  if (!token || token !== env.ADMIN_TOKEN) {
+  const header = request.headers.get("Authorization") || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : "";
+
+  if (!env.ADMIN_TOKEN) {
+    // Fail closed, and say why in the logs. A missing secret must never mean
+    // "let everyone in" — matching the products API Worker, which shares this
+    // same token.
+    console.error("ADMIN_TOKEN is not configured");
+    return json({ error: "Admin access is not configured." }, 503);
+  }
+  if (!token || !timingSafeEqual(token, env.ADMIN_TOKEN)) {
     return json({ error: "Sign in as an admin to upload products." }, 401);
   }
   return null;
+}
+
+// Constant-time compare: a plain !== leaks how much of the token matched via
+// response timing. Both Workers accept the same token, so weak checking on
+// either one weakens both.
+function timingSafeEqual(a, b) {
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
 }
 
 function json(body, status = 200) {
@@ -232,7 +300,3 @@ function cors(response, env) {
   return new Response(response.body, { status: response.status, headers: h });
 }
 
-function ctxWaitUntil(promise) {
-  // In a real handler this comes from the ctx argument; kept simple here.
-  promise.catch(() => {});
-}

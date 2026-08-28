@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { TEMonogram } from "./BrandLogo.jsx";
-import { admin, CATEGORIES, CONDITIONS, SIZES, API_BASE } from "./api.js";
+import { admin, uploadPhoto, IMAGE_API, CATEGORIES, CONDITIONS, SIZES, API_BASE } from "./api.js";
 
 /**
  * Thrift by Eugy — Admin
@@ -12,8 +12,10 @@ import { admin, CATEGORIES, CONDITIONS, SIZES, API_BASE } from "./api.js";
  * that never touches persistent storage cannot be read back by anything that
  * later manages to run script on this origin.
  *
- * Photo processing below is still a local mock: the image pipeline Worker is
- * not deployed yet, so nothing is uploaded. Everything else is live.
+ * Photos upload to the image pipeline Worker when VITE_IMAGE_API is set.
+ * They are sent AFTER the product is created, because the upload is keyed by
+ * SKU and the SKU is not settled until then. Without that variable the panel
+ * keeps a local preview and says plainly that nothing was stored.
  */
 
 const GOLD = "#C9A227";
@@ -506,10 +508,10 @@ function OrdersView({ token }) {
 function AddView({ token, onAdded }) {
   const [mode, setMode] = useState("auto");
   const [files, setFiles] = useState([]);
-  const [processing, setProcessing] = useState(false);
   const [results, setResults] = useState([]);
   const [dragging, setDragging] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [stage, setStage] = useState("");
   const [error, setError] = useState("");
   const [ok, setOk] = useState("");
   const inputRef = useRef();
@@ -521,53 +523,55 @@ function AddView({ token, onAdded }) {
   const [form, setForm] = useState(blank);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
+  // Keep the File itself, not just a preview URL — it is what gets uploaded.
   const handleFiles = (list) => {
-    setFiles(Array.from(list).slice(0, 5).map((f) => ({ name: f.name, size: f.size, url: URL.createObjectURL(f) })));
+    setFiles(Array.from(list).slice(0, 5).map((f) => ({ file: f, name: f.name, size: f.size, url: URL.createObjectURL(f) })));
     setResults([]);
   };
 
-  const runProcessing = () => {
-    setProcessing(true);
-    setResults([]);
-    setTimeout(() => {
-      setResults(files.map((f, i) => {
-        const originalKB = Math.round(f.size / 1024) || 2400;
-        const avif = Math.max(28, Math.round(originalKB * 0.13));
-        return {
-          name: f.name, url: f.url, original: originalKB, avif,
-          webp: Math.max(40, Math.round(originalKB * 0.21)),
-          jpg: Math.max(70, Math.round(originalKB * 0.38)),
-          saved: Math.round((1 - avif / originalKB) * 100),
-          garment: i % 2 === 0 ? "light" : "dark",
-          backdrop: i % 2 === 0 ? "Brand ink" : "White",
-          cutout: mode === "auto",
-        };
-      }));
-      setProcessing(false);
-    }, 1200);
-  };
-
-  const fmtKB = (kb) => (kb >= 1024 ? (kb / 1024).toFixed(1) + " MB" : kb + " KB");
 
   const submit = async (status) => {
     setSaving(true);
     setError("");
     setOk("");
+    setResults([]);
     try {
-      await admin.create(token, {
-        ...form,
-        price: Number(form.price),
-        quantity: 1,
-        status,
-      });
-      setOk(`${form.sku} saved as ${status}.`);
+      setStage("Saving item…");
+      await admin.create(token, { ...form, price: Number(form.price), quantity: 1, status });
+
+      // Photos go up only after the product exists: the Worker keys objects by
+      // SKU, and a failed upload must not cost you the item you just typed in.
+      let uploaded = 0;
+      const out = [];
+      if (IMAGE_API && files.length) {
+        for (let i = 0; i < files.length; i++) {
+          setStage(`Uploading photo ${i + 1} of ${files.length}…`);
+          try {
+            const r = await uploadPhoto(token, { sku: form.sku, index: i + 1, file: files[i].file, processing: mode });
+            uploaded++;
+            out.push({ name: files[i].name, url: files[i].url, ok: true, note: r.note, cutout: r.cutout });
+          } catch (err) {
+            out.push({ name: files[i].name, url: files[i].url, ok: false, note: err.message });
+          }
+        }
+        setResults(out);
+        if (uploaded) {
+          setStage("Linking photos…");
+          await admin.update(token, form.sku, { image_count: uploaded });
+        }
+      }
+
+      setOk(
+        `${form.sku} saved as ${status}.` +
+          (IMAGE_API && files.length ? ` ${uploaded} of ${files.length} photo(s) uploaded.` : "")
+      );
       setForm(blank);
       setFiles([]);
-      setResults([]);
       onAdded?.();
     } catch (err) {
       setError(err.message);
     } finally {
+      setStage("");
       setSaving(false);
     }
   };
@@ -609,7 +613,9 @@ function AddView({ token, onAdded }) {
         </div>
 
         <p className="text-[10px] mt-2" style={{ color: "#6a5a2a" }}>
-          Photos are previewed locally only — the image pipeline Worker is not deployed yet, so they are not uploaded with the product.
+          {IMAGE_API
+            ? "Photos upload when you save — the item has to exist first, since photos are stored against its SKU."
+            : "Preview only: no image Worker is configured (VITE_IMAGE_API), so these photos will not be stored with the product."}
         </p>
 
         {files.length > 0 && (
@@ -624,40 +630,24 @@ function AddView({ token, onAdded }) {
                 </div>
               ))}
             </div>
-            <button
-              onClick={runProcessing}
-              disabled={processing}
-              className="mt-4 w-full font-semibold text-[13px] py-2.5 rounded-full disabled:opacity-50"
-              style={{ background: GOLD, color: INK }}
-            >
-              {processing ? "Processing…" : `Process ${files.length} photo${files.length > 1 ? "s" : ""}`}
-            </button>
+
           </div>
         )}
 
         {results.length > 0 && (
           <div className="mt-5 rounded-lg overflow-hidden" style={{ border: `1px solid ${LINE}` }}>
-            <div className="px-3 py-2 flex justify-between items-center" style={{ background: PANEL, borderBottom: `1px solid ${LINE}` }}>
-              <span className="text-[11px] uppercase tracking-[0.12em]" style={{ color: "#888" }}>Processed (preview)</span>
-              <span className="text-[11px]" style={{ color: GOLD }}>
-                {Math.round(results.reduce((s, r) => s + r.saved, 0) / results.length)}% smaller on average
-              </span>
+            <div className="px-3 py-2" style={{ background: PANEL, borderBottom: `1px solid ${LINE}` }}>
+              <span className="text-[11px] uppercase tracking-[0.12em]" style={{ color: "#888" }}>Uploads</span>
             </div>
             <div>
               {results.map((r, i) => (
                 <div key={i} className="p-3 flex gap-3 items-start" style={{ borderTop: i ? `1px solid ${LINE}` : "none" }}>
                   <img src={r.url} alt="" className="w-12 h-14 object-cover rounded" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-[12px] truncate" style={{ color: "#ddd" }}>{r.name}</p>
-                    <p className="text-[11px] mt-0.5" style={{ color: "#666" }}>
-                      {r.cutout ? `Cut out · ${r.garment} garment · ${r.backdrop} backdrop` : "Kept as shot"}
+                    <p className="text-[12px] truncate" style={{ color: r.ok ? "#ddd" : "#E9A5A5" }}>{r.name}</p>
+                    <p className="text-[11px] mt-0.5" style={{ color: r.ok ? "#8a8a6a" : "#E9A5A5" }}>
+                      {r.note || (r.ok ? (r.cutout ? "Background removed and stored." : "Stored and optimised.") : "Upload failed.")}
                     </p>
-                    <div className="flex gap-3 mt-1.5 text-[10px]">
-                      <span className="line-through" style={{ color: "#555" }}>{fmtKB(r.original)}</span>
-                      <span style={{ color: GOLD_LIGHT }}>AVIF {fmtKB(r.avif)}</span>
-                      <span style={{ color: "#888" }}>WebP {fmtKB(r.webp)}</span>
-                      <span style={{ color: "#666" }}>JPG {fmtKB(r.jpg)}</span>
-                    </div>
                   </div>
                 </div>
               ))}
@@ -723,7 +713,7 @@ function AddView({ token, onAdded }) {
           className="w-full font-semibold text-[13px] py-2.5 rounded-full disabled:opacity-40"
           style={{ background: GOLD, color: INK }}
         >
-          {saving ? "Saving…" : "Publish Item"}
+          {saving ? stage || "Saving…" : "Publish Item"}
         </button>
         <button
           onClick={() => submit("draft")}

@@ -176,3 +176,37 @@ export const admin = {
   order: (token, id) => request(`/api/admin/orders/${encodeURIComponent(id)}`, { token }),
   stats: (token) => request("/api/admin/stats", { token }),
 };
+
+// ---------------------------------------------------------------------------
+// Image pipeline Worker (images/worker-images.js)
+//
+// Separate deployment from the products API, but it accepts the SAME admin
+// token. Until VITE_IMAGE_API is set there is nowhere to upload to, so the
+// admin panel says so rather than pretending a photo was stored.
+// ---------------------------------------------------------------------------
+export const IMAGE_API = import.meta.env.VITE_IMAGE_API || "";
+
+export async function uploadPhoto(token, { sku, index, file, processing = "asis" }) {
+  if (!IMAGE_API) throw new ApiError("No image Worker configured (VITE_IMAGE_API).", 0);
+
+  const form = new FormData();
+  form.append("sku", sku);
+  form.append("index", String(index));
+  form.append("processing", processing);
+  form.append("file", file);
+
+  let res;
+  try {
+    res = await fetch(`${IMAGE_API.replace(/\/$/, "")}/admin/upload`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form, // no Content-Type header: the browser sets the multipart boundary
+    });
+  } catch {
+    throw new ApiError("Could not reach the image service.", 0);
+  }
+
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new ApiError(data?.error || `Upload failed (${res.status})`, res.status);
+  return data;
+}

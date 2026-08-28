@@ -35,7 +35,7 @@ The official logo artwork lives in `public/brand/`: `crest.png` (the laurel TE c
 
 Open `#/admin` and sign in with the Worker's `ADMIN_TOKEN`. Three tabs:
 
-- **Add Product** — item details form that `POST`s to the API, publishing live or saving as a draft. (Photo upload is still a local preview: the image pipeline Worker is not deployed, so photos are not sent with the product.)
+- **Add Product** — item details form that `POST`s to the API, publishing live or saving as a draft. Photos upload to the image Worker afterwards (they are keyed by SKU, so the item has to exist first) and the product's `image_count` is patched to match. Without `VITE_IMAGE_API` the panel keeps a local preview and says plainly that nothing was stored.
 - **Products** — every product including drafts, sold and archived, filterable by status, with inline **edit**, **publish** / **unpublish**, and **archive**. Publishing a draft is the UI path that previously only existed as a raw API call.
 - **Orders** — orders newest first, filterable by status, expanding to show contact details and line items.
 
@@ -45,7 +45,18 @@ A stats strip across the top reads `/api/admin/stats`: live, drafts, sold, reser
 
 ## Image pipeline
 
-`worker/worker-images.js` is the Cloudflare Worker that backs the admin upload flow: it stores one full-quality master per photo in R2 and serves resized AVIF/WebP/JPEG variants (thumb/card/detail/zoom) via content negotiation, with EXIF stripped on delivery. `worker/wrangler-images.toml.example` shows the required bindings; see [docs/IMAGE_GUIDE.md](docs/IMAGE_GUIDE.md) for the full guide, including the one open decision (where background removal runs: Cloudflare Workers AI vs. a small rembg container).
+`images/worker-images.js` (config `images/wrangler.toml`) stores one full-quality master per photo in R2 and derives every delivered size from it: thumb / card / detail / zoom, encoded as AVIF, WebP or JPEG per the browser's `Accept` header, with EXIF (including phone GPS) stripped on delivery.
+
+```bash
+cd images
+wrangler r2 bucket create thriftbyeugy-images
+wrangler secret put ADMIN_TOKEN     # the SAME token as the products API
+wrangler deploy
+```
+
+Then set `VITE_IMAGE_API` (admin uploads) and `VITE_IMAGE_BASE` (storefront delivery) to the deployed URL.
+
+**"Clean up automatically" does not work yet.** Background removal needs a model Workers cannot host, so the Worker calls out to a separate service that has not been stood up. Until `CUTOUT_SERVICE_URL` is set it skips the attempt and stores the photo as shot — still compressed and format-optimised — and both the Worker and the admin panel say so rather than implying the cleanup ran. See [docs/IMAGE_DEPLOY_GUIDE.md](docs/IMAGE_DEPLOY_GUIDE.md) for the two ways to close that gap, and [docs/IMAGE_GUIDE.md](docs/IMAGE_GUIDE.md) for the format and sizing rationale.
 
 ## 360° spin viewer
 
@@ -82,6 +93,7 @@ The Worker sets `Access-Control-Allow-Origin` to `SITE_ORIGIN` (the deployed Pag
 | `VITE_API_URL` | Override the API base (e.g. a local mock). Defaults to the dev proxy in development and the live Worker in a build. |
 | `VITE_API_PROXY` | Change what the dev/preview proxy points at. |
 | `VITE_IMAGE_BASE` | Serve product photos from the image pipeline Worker. Until it is deployed, the committed photos in `public/products/` are used, and anything without one falls back to its colour gradient. |
+| `VITE_IMAGE_API` | Image Worker base URL for admin uploads. Unset means photos are previewed but not stored. |
 
 The API stores a colour *name* ("Coral"); the client maps it to a hex for the card gradient behind a cut-out photo, falling back to a stable palette pick per SKU.
 
