@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import Storefront from "./Storefront.jsx";
-import ThriftByEugy from "./ThriftByEugy.jsx";
 import AdminUpload from "./AdminUpload.jsx";
 import SpinViewerDemo from "./SpinViewer.jsx";
 import RecommenderLab from "./RecommenderLab.jsx";
@@ -21,7 +20,6 @@ const VIEWS = [
   { id: "spin", label: "360° Viewer", component: SpinViewerDemo, note: "Product rotation" },
   { id: "admin", label: "Admin Upload", component: AdminUpload, note: "Add products" },
   { id: "recommender", label: "Recommender", component: RecommenderLab, note: "AI suggestions" },
-  { id: "classic", label: "Classic Storefront", component: ThriftByEugy, note: "Original layout" },
 ];
 
 function getHash() {

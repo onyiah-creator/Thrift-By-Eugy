@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from "react";
-import { ALL_PRODUCTS, CATEGORIES } from "./catalogue.js";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
+import { CATEGORIES, fetchProducts } from "./api.js";
 import { forYou, trending, completeTheLook } from "./recommender.js";
 
 /**
@@ -37,8 +37,6 @@ const EDITS = [
 ];
 
 const PALETTE = ["#C8836B", "#7E9B8A", "#C9A227", "#6E7BA6", "#B5674F", "#5F8A8A", "#9A6E92", "#8A8A55"];
-
-const ALL = ALL_PRODUCTS;
 
 const naira = (n) => "\u20A6" + n.toLocaleString("en-NG");
 
@@ -128,6 +126,42 @@ function Card({ p, onOpen, onSave, saved, tall }) {
 }
 
 // ---------------------------------------------------------------------------
+// Catalogue status — shown instead of product grids while the live catalogue
+// is loading, unreachable, or genuinely empty. An empty shop is a normal
+// state for one-of-one stock: it means everything sold.
+// ---------------------------------------------------------------------------
+function CatalogueStatus({ loading, error, onRetry }) {
+  if (loading) {
+    return (
+      <section className="max-w-6xl mx-auto px-4 py-16 text-center">
+        <div className="inline-block w-6 h-6 rounded-full mb-4" style={{ border: `2px solid ${HAIR}`, borderTopColor: GOLD, animation: "tbe-spin 0.8s linear infinite" }} />
+        <p className="text-[13px]" style={{ color: INK_SOFT }}>Loading the collection…</p>
+        <style>{`@keyframes tbe-spin { to { transform: rotate(360deg) } }`}</style>
+      </section>
+    );
+  }
+  if (error) {
+    return (
+      <section className="max-w-6xl mx-auto px-4 py-16 text-center">
+        <h2 className="font-display italic text-2xl mb-2" style={{ color: INK }}>The rail is not loading</h2>
+        <p className="text-[13px] mb-5 max-w-sm mx-auto" style={{ color: INK_SOFT }}>{error}</p>
+        <button onClick={onRetry} className="font-medium text-[13px] px-6 py-3" style={{ background: INK, color: WHITE }}>
+          Try again
+        </button>
+      </section>
+    );
+  }
+  return (
+    <section className="max-w-6xl mx-auto px-4 py-16 text-center">
+      <h2 className="font-display italic text-2xl mb-2" style={{ color: INK }}>Everything has found a home</h2>
+      <p className="text-[13px] max-w-sm mx-auto" style={{ color: INK_SOFT }}>
+        Every piece here is one-of-one, so the rail empties as things sell. New arrivals are photographed and listed weekly.
+      </p>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
 export default function Storefront() {
   const [view, setView] = useState("home");
   const [category, setCategory] = useState("All");
@@ -146,6 +180,22 @@ export default function Storefront() {
   const [shipping, setShipping] = useState({ name: "", phone: "", address: "", city: "" });
   const [payMethod, setPayMethod] = useState("card");
   const [orderRef, setOrderRef] = useState(null);
+
+  // Live catalogue. Only sellable stock is ever returned, so anything here can
+  // be bought; a sold piece simply stops appearing on the next load.
+  const [ALL, setAll] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+
+  const reload = useCallback(() => {
+    setLoading(true);
+    return fetchProducts({ limit: 60 })
+      .then(({ products }) => { setAll(products); setLoadError(""); })
+      .catch((err) => setLoadError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { reload(); }, [reload]);
 
   const open = (p) => { setQuick(p); setRecent((r) => [p, ...r.filter((x) => x.id !== p.id)].slice(0, 12)); };
   const toggleSave = (p) => setSaved((s) => (s.find((x) => x.id === p.id) ? s.filter((x) => x.id !== p.id) : [p, ...s]));
@@ -340,6 +390,11 @@ export default function Storefront() {
             </div>
           </section>
 
+          {(loading || loadError || ALL.length === 0) && (
+            <CatalogueStatus loading={loading} error={loadError} onRetry={reload} />
+          )}
+
+          {!loading && !loadError && ALL.length > 0 && (<>
           {/* THE EDIT */}
           <section className="py-12" style={{ background: CREAM, borderTop: `1px solid ${HAIR}`, borderBottom: `1px solid ${HAIR}` }}>
             <div className="max-w-6xl mx-auto px-4">
@@ -392,6 +447,7 @@ export default function Storefront() {
               {ALL.map((p) => <div key={p.id} className="break-inside-avoid"><Card p={p} onOpen={open} onSave={toggleSave} saved={isSaved(p)} tall /></div>)}
             </div>
           </section>
+          </>)}
         </>
       )}
 
@@ -421,10 +477,22 @@ export default function Storefront() {
               </button>
             ))}
           </div>
-          <p className="text-[11px] mb-4" style={{ color: INK_SOFT }}>{filtered.length} pieces</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {filtered.map((p) => <Card key={p.id} p={p} onOpen={open} onSave={toggleSave} saved={isSaved(p)} />)}
-          </div>
+          {loading || loadError ? (
+            <CatalogueStatus loading={loading} error={loadError} onRetry={reload} />
+          ) : filtered.length === 0 ? (
+            <p className="text-[13px] py-12 text-center" style={{ color: INK_SOFT }}>
+              {query || category !== "All"
+                ? "Nothing matches that yet — try another category or search."
+                : "Everything has sold. New arrivals are listed weekly."}
+            </p>
+          ) : (
+            <>
+              <p className="text-[11px] mb-4" style={{ color: INK_SOFT }}>{filtered.length} pieces</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                {filtered.map((p) => <Card key={p.id} p={p} onOpen={open} onSave={toggleSave} saved={isSaved(p)} />)}
+              </div>
+            </>
+          )}
         </section>
       )}
 

@@ -26,7 +26,6 @@ A gold **☰ button (bottom-right)** switches between every prototype — a revi
 | `#/spin` | 360° spin viewer demo |
 | `#/admin` | Add Product admin panel |
 | `#/recommender` | Recommender Lab — the suggestion engine made visible |
-| `#/classic` | Original storefront layout |
 
 ## Brand
 
@@ -34,7 +33,15 @@ The official logo artwork lives in `public/brand/`: `crest.png` (the laurel TE c
 
 ## Admin panel
 
-Open `#/admin` (e.g. http://localhost:5173/#/admin) for the **Add Product** page: drag-and-drop photo upload with two processing modes (automatic background cleanup, or keep the photo as shot), a compression report (AVIF/WebP/JPEG sizes), and the item details form matching the product template columns.
+Open `#/admin` and sign in with the Worker's `ADMIN_TOKEN`. Three tabs:
+
+- **Add Product** — item details form that `POST`s to the API, publishing live or saving as a draft. (Photo upload is still a local preview: the image pipeline Worker is not deployed, so photos are not sent with the product.)
+- **Products** — every product including drafts, sold and archived, filterable by status, with inline **edit**, **publish** / **unpublish**, and **archive**. Publishing a draft is the UI path that previously only existed as a raw API call.
+- **Orders** — orders newest first, filterable by status, expanding to show contact details and line items.
+
+A stats strip across the top reads `/api/admin/stats`: live, drafts, sold, reserved now, pending and paid orders, and revenue.
+
+**The token is held in React state only** — never localStorage, sessionStorage, or a cookie — so closing the tab ends the session and nothing can read it back later. It is sent as `Authorization: Bearer …` on every admin call.
 
 ## Image pipeline
 
@@ -46,7 +53,7 @@ Open `#/admin` (e.g. http://localhost:5173/#/admin) for the **Add Product** page
 
 ## Adding stock
 
-`scripts/Add-Product.ps1` talks to the deployed API directly, so products added this way are real — they live in D1 and appear automatically once the storefront is wired to the API. Nothing has to be redone later.
+`scripts/Add-Product.ps1` talks to the deployed API directly, so products added this way are real — they live in D1 and show up in the storefront and admin panel immediately. The admin panel can do all of this too; the script stays useful for bulk CSV imports.
 
 ```powershell
 $env:TBE_TOKEN = "your-admin-token"      # never hard-coded in the script
@@ -64,6 +71,20 @@ The script is saved UTF-8 **with BOM** and CRLF line endings, and `.gitattribute
 
 `templates/products-template.csv` is the bulk-import format (the richer `templates/ThriftByEugy_Product_Template.xlsx` remains the full cataloguing sheet, including image filenames).
 
+## Frontend ↔ API
+
+`src/api.js` is the single client for both the storefront and the admin panel. The storefront, the Recommender Lab and the admin panel all read the live database — there is no demo catalogue left in the code.
+
+The Worker sets `Access-Control-Allow-Origin` to `SITE_ORIGIN` (the deployed Pages URL), so a browser on `localhost` would be refused. Rather than loosening that, `vite.config.js` proxies `/api` to the Worker in dev and preview, keeping those calls same-origin. A production build calls the Worker URL directly, where the origin does match.
+
+| Variable | Effect |
+| --- | --- |
+| `VITE_API_URL` | Override the API base (e.g. a local mock). Defaults to the dev proxy in development and the live Worker in a build. |
+| `VITE_API_PROXY` | Change what the dev/preview proxy points at. |
+| `VITE_IMAGE_BASE` | Serve product photos from the image pipeline Worker. Until it is deployed, the committed photos in `public/products/` are used, and anything without one falls back to its colour gradient. |
+
+The API stores a colour *name* ("Coral"); the client maps it to a hex for the card gradient behind a cut-out photo, falling back to a stable palette pick per SKU.
+
 ## Products & admin API
 
 `api/worker-api.js` (config: `api/wrangler.toml`) is the read/write layer the storefront and admin panel need. Public routes (`GET /api/products`, `GET /api/products/:sku`) only ever return `status='active'` stock, so drafts and sold pieces can't be reached by guessing a URL — though a single sold item still resolves with `available: false`, because links to sold one-of-one pieces get shared constantly and "this one's gone, here's what's similar" beats a 404.
@@ -80,7 +101,7 @@ The products/admin API deploys from `api/`, which has its own `wrangler.toml`. T
 
 The test that matters after deploying: `curl https://<api-url>/api/admin/products` with **no** token must return 401. See [docs/API_GUIDE.md](docs/API_GUIDE.md).
 
-> ⚠️ **The admin panel at `#/admin` still has no authentication.** That is harmless while it's a mock, but it must not be wired to these write endpoints until it holds the token behind a login (or sits behind Cloudflare Access).
+> The admin panel now holds the token behind a sign-in and keeps it in memory only. A single shared token is right for a one-person shop; move to Cloudflare Access the moment someone else needs their own login.
 
 ## Checkout & inventory backend
 

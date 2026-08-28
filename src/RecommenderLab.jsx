@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from "react";
-import { ALL_PRODUCTS } from "./catalogue.js";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
+import { fetchProducts } from "./api.js";
 import { similarItems, completeTheLook, similarity } from "./recommender.js";
 import { TEMonogram } from "./BrandLogo.jsx";
 
@@ -39,7 +39,7 @@ function ResultRow({ p, seed, score }) {
       <div className="flex-1 min-w-0">
         <p className="text-[12px] truncate" style={{ color: IVORY }}>{p.name}</p>
         <p className="text-[10px]" style={{ color: "#777" }}>
-          {p.category} · {p.color} · Size {p.size} · {naira(p.price)}
+          {p.category} · {p.colorName || "—"} · Size {p.size} · {naira(p.price)}
         </p>
         <div className="mt-1 h-[3px] rounded overflow-hidden" style={{ background: LINE }}>
           <div className="h-full" style={{ width: `${Math.min(100, Math.round(score * 100))}%`, background: GOLD }} />
@@ -58,13 +58,35 @@ function ResultRow({ p, seed, score }) {
  * for it, with the underlying scores. A review tool, not a shopper page.
  */
 export default function RecommenderLab() {
-  const [seed, setSeed] = useState(ALL_PRODUCTS[0]);
+  // Runs against the live catalogue, so what it scores here is exactly what a
+  // shopper would be shown.
+  const [catalogue, setCatalogue] = useState([]);
+  const [seed, setSeed] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const reload = useCallback(() => {
+    setLoading(true);
+    return fetchProducts({ limit: 60 })
+      .then(({ products }) => {
+        setCatalogue(products);
+        setSeed((cur) => products.find((p) => p.sku === cur?.sku) || products[0] || null);
+        setError("");
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { reload(); }, [reload]);
 
   const similar = useMemo(
-    () => similarItems(seed, ALL_PRODUCTS, { limit: 6 }).map((p) => ({ p, score: similarity(seed, p) })),
-    [seed]
+    () => (seed ? similarItems(seed, catalogue, { limit: 6 }).map((p) => ({ p, score: similarity(seed, p) })) : []),
+    [seed, catalogue]
   );
-  const look = useMemo(() => completeTheLook(seed, ALL_PRODUCTS, { limit: 4 }), [seed]);
+  const look = useMemo(
+    () => (seed ? completeTheLook(seed, catalogue, { limit: 4 }) : []),
+    [seed, catalogue]
+  );
 
   return (
     <div className="min-h-screen p-6" style={{ background: INK, color: IVORY, fontFamily: "Inter, sans-serif" }}>
@@ -85,10 +107,28 @@ export default function RecommenderLab() {
           colour family, price band, size, style keywords, and condition — sold items never appear.
         </p>
 
+        {loading && <p className="text-[13px] py-8" style={{ color: "#666" }}>Loading the live catalogue…</p>}
+
+        {!loading && error && (
+          <div className="py-8">
+            <p className="text-[13px] mb-3" style={{ color: "#E9A5A5" }}>{error}</p>
+            <button onClick={reload} className="text-[12px] px-4 py-2 rounded-full" style={{ border: `1px solid ${LINE}`, color: "#999" }}>
+              Try again
+            </button>
+          </div>
+        )}
+
+        {!loading && !error && catalogue.length === 0 && (
+          <p className="text-[13px] py-8" style={{ color: "#666" }}>
+            Nothing live to score yet. Publish a product in the admin panel and it will appear here.
+          </p>
+        )}
+
+        {!loading && !error && seed && (<>
         {/* Seed picker */}
         <p className="text-[10px] uppercase tracking-[0.15em] mb-2" style={{ color: "#666" }}>Seed item</p>
         <div className="flex gap-2.5 overflow-x-auto no-sb pb-2 mb-8">
-          {ALL_PRODUCTS.slice(0, 14).map((p) => (
+          {catalogue.slice(0, 14).map((p) => (
             <Thumb key={p.sku} p={p} active={seed.sku === p.sku} onClick={() => setSeed(p)} />
           ))}
         </div>
@@ -128,6 +168,7 @@ export default function RecommenderLab() {
             </div>
           </div>
         </div>
+        </>)}
       </div>
     </div>
   );
