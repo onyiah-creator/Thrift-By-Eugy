@@ -35,7 +35,7 @@ The official logo artwork lives in `public/brand/`: `crest.png` (the laurel TE c
 
 Open `#/admin` and sign in with the Worker's `ADMIN_TOKEN`. Three tabs:
 
-- **Add Product** — item details form that `POST`s to the API, publishing live or saving as a draft. Photos upload to the image Worker afterwards (they are keyed by SKU, so the item has to exist first) and the product's `image_count` is patched to match. Without `VITE_IMAGE_API` the panel keeps a local preview and says plainly that nothing was stored.
+- **Add Product** — item details form that `POST`s to the API, publishing live or saving as a draft. Photos upload to the image Worker afterwards (they are keyed by SKU, so the item has to exist first) and the product's `image_count` is patched to match. If no image Worker is reachable the panel keeps a local preview and says plainly that nothing was stored.
 - **Products** — every product including drafts, sold and archived, filterable by status, with inline **edit**, **publish** / **unpublish**, and **archive**. Publishing a draft is the UI path that previously only existed as a raw API call.
 - **Orders** — orders newest first, filterable by status, expanding to show contact details and line items.
 
@@ -56,7 +56,7 @@ wrangler secret put ADMIN_TOKEN     # the SAME token as the products API
 wrangler deploy
 ```
 
-Then set `VITE_IMAGE_API` (admin uploads) and `VITE_IMAGE_BASE` (storefront delivery) to the deployed URL.
+Both the storefront and the admin panel default to the deployed Worker; `VITE_IMAGE_BASE` overrides delivery and `VITE_IMAGE_API` overrides the upload target. See **Frontend ↔ API** for why only the first belongs in `.env`.
 
 **"Clean up automatically" does not work yet.** Background removal needs a model Workers cannot host, so the Worker calls out to a separate service that has not been stood up. Until `CUTOUT_SERVICE_URL` is set it skips the attempt and stores the photo as shot — still compressed and format-optimised — and both the Worker and the admin panel say so rather than implying the cleanup ran. See [docs/IMAGE_DEPLOY_GUIDE.md](docs/IMAGE_DEPLOY_GUIDE.md) for the two ways to close that gap, and [docs/IMAGE_GUIDE.md](docs/IMAGE_GUIDE.md) for the format and sizing rationale.
 
