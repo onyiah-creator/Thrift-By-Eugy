@@ -45,7 +45,9 @@ A stats strip across the top reads `/api/admin/stats`: live, drafts, sold, reser
 
 ## Image pipeline
 
-`images/worker-images.js` (config `images/wrangler.toml`) stores one full-quality master per photo in R2 and derives every delivered size from it: thumb / card / detail / zoom, encoded as AVIF, WebP or JPEG per the browser's `Accept` header, with EXIF (including phone GPS) stripped on delivery.
+`images/worker-images.js` (config `images/wrangler.toml`) compresses each photo *before* storing it — the upload is written to a temporary R2 key, pulled back through Cloudflare's edge resizer, and only the re-encoded result becomes the master, so storage and every later resize both work from a smaller file. Delivery then derives thumb / card / detail / zoom from that master, encoded as AVIF, WebP or JPEG per the browser's `Accept` header, with EXIF (including phone GPS) stripped.
+
+The stored master keeps an alpha channel whenever the source could have one (PNG, WebP, or a cutout): these product photos are transparent cut-outs composited over a colour gradient, and JPEG has no alpha, so flattening them would be permanent. Opaque photos become baseline JPEG. If the resizer is unavailable the upload still succeeds at original size and says so rather than failing.
 
 ```bash
 cd images

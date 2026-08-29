@@ -26,6 +26,9 @@ const LINE = "#2a2a2d";
 
 const naira = (n) => "₦" + Number(n || 0).toLocaleString("en-NG");
 
+const fmtBytes = (b) =>
+  !b ? "—" : b >= 1024 * 1024 ? (b / 1024 / 1024).toFixed(1) + " MB" : Math.round(b / 1024) + " KB";
+
 const inputCls =
   "w-full bg-[#0A0A0C] border border-[#2a2a2d] rounded px-3 py-2 text-[13px] text-[#F3ECDD] focus:outline-none focus:border-[#C9A227] placeholder:text-[#555]";
 
@@ -549,7 +552,10 @@ function AddView({ token, onAdded }) {
           try {
             const r = await uploadPhoto(token, { sku: form.sku, index: i + 1, file: files[i].file, processing: mode });
             uploaded++;
-            out.push({ name: files[i].name, url: files[i].url, ok: true, note: r.note, cutout: r.cutout });
+            out.push({
+              name: files[i].name, url: files[i].url, ok: true, note: r.note, cutout: r.cutout,
+              originalBytes: r.originalBytes, storedBytes: r.storedBytes, savedPercent: r.savedPercent,
+            });
           } catch (err) {
             out.push({ name: files[i].name, url: files[i].url, ok: false, note: err.message });
           }
@@ -648,6 +654,13 @@ function AddView({ token, onAdded }) {
                     <p className="text-[11px] mt-0.5" style={{ color: r.ok ? "#8a8a6a" : "#E9A5A5" }}>
                       {r.note || (r.ok ? (r.cutout ? "Background removed and stored." : "Stored and optimised.") : "Upload failed.")}
                     </p>
+                    {r.ok && r.storedBytes > 0 && (
+                      <p className="text-[10px] mt-1" style={{ color: "#777" }}>
+                        <span className="line-through">{fmtBytes(r.originalBytes)}</span>{" "}
+                        <span style={{ color: GOLD_LIGHT }}>{fmtBytes(r.storedBytes)}</span>
+                        {r.savedPercent > 0 && <span> · {r.savedPercent}% smaller</span>}
+                      </p>
+                    )}
                   </div>
                 </div>
               ))}

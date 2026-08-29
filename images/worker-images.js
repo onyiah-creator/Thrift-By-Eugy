@@ -72,11 +72,65 @@ export default {
  */
 async function handleRaw(env, url) {
   const [, , sku, index] = url.pathname.split("/");
-  const object = await env.PRODUCT_IMAGES.get(`products/${sku}/${index}.master`);
+  // ?src=tmp reads the just-uploaded, not-yet-compressed file — used only
+  // internally, during the upload step, to give the resizer something to
+  // fetch and shrink before the real master is ever written.
+  const useTmp = url.searchParams.get("src") === "tmp";
+  const key = `products/${sku}/${index}.${useTmp ? "upload-tmp" : "master"}`;
+  const object = await env.PRODUCT_IMAGES.get(key);
   if (!object) return new Response("Not found", { status: 404 });
   return new Response(object.body, {
     headers: { "Content-Type": object.httpMetadata?.contentType || "application/octet-stream" },
   });
+}
+
+/**
+ * Shrinks the uploaded photo BEFORE it's ever written as the permanent
+ * master — this is the actual "reduce size, keep quality" step. Everything
+ * downstream (thumb/card/detail/zoom) derives from this already-smaller file,
+ * so storage and every later resize both benefit, not just delivery.
+ *
+ * Workers can't run image codecs directly, so this uses the same mechanism
+ * already proven live on this Worker: write the raw bytes to a temporary R2
+ * key, then fetch that key back through Cloudflare's edge resizer via
+ * cf.image, which returns genuinely re-encoded, smaller bytes.
+ */
+async function compressForStorage(env, sku, index, isCutout, origin, sourceType) {
+  const tmpUrl = new URL(`/_raw/${sku}/${index}?src=tmp`, origin);
+
+  // Anything that CAN carry alpha must stay in a format that has alpha.
+  // Keying this off isCutout alone flattens every transparent PNG a shopper
+  // never sees cut out by this Worker — including photos already background-
+  // removed elsewhere, which is exactly what this shop uploads. JPEG has no
+  // alpha channel, so that loss is permanent in the stored master.
+  // WebP keeps transparency and still compresses far better than PNG.
+  // Ordinary opaque photos become baseline JPEG: the most compatible format
+  // for a long-lived master, since it is re-encoded to AVIF/WebP/JPEG again
+  // at delivery time for whichever browser is asking.
+  const mayHaveAlpha =
+    isCutout || sourceType === "image/png" || sourceType === "image/webp";
+  const format = mayHaveAlpha ? "webp" : "baseline-jpeg";
+
+  const response = await fetch(tmpUrl, {
+    cf: {
+      image: {
+        width: 2000,          // generous ceiling — covers pinch-to-zoom, never upscales smaller photos
+        quality: mayHaveAlpha ? 90 : 88,
+        format,
+        fit: "scale-down",
+        metadata: "none",
+      },
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Storage compression returned ${response.status}`);
+  }
+
+  return {
+    bytes: new Uint8Array(await response.arrayBuffer()),
+    contentType: mayHaveAlpha ? "image/webp" : "image/jpeg",
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -102,6 +156,7 @@ async function handleUpload(request, env) {
   }
 
   let bytes = new Uint8Array(await file.arrayBuffer());
+  const originalBytes = file.size;
   let meta = { processing, cutout: false };
 
   if (processing === "auto") {
@@ -125,11 +180,36 @@ async function handleUpload(request, env) {
     }
   }
 
-  // Store the master. Every delivered size is derived from this one file,
-  // so we keep it at full quality and never re-encode the master.
+  // Compress BEFORE persisting. Write to a temp key only so the edge resizer
+  // has a URL to fetch — this key never survives past this one request.
+  const tmpKey = `products/${sku}/${index}.upload-tmp`;
+  let contentType = meta.cutout ? "image/png" : file.type;
+
+  await env.PRODUCT_IMAGES.put(tmpKey, bytes, { httpMetadata: { contentType } });
+
+  try {
+    const compressed = await compressForStorage(env, sku, index, meta.cutout, request.url, contentType);
+    bytes = compressed.bytes;
+    contentType = compressed.contentType;
+    meta.storedBytes = bytes.length;
+    meta.savedPercent = Math.max(0, Math.round((1 - bytes.length / originalBytes) * 100));
+  } catch (err) {
+    // If the resizer is unavailable for any reason, the upload must still
+    // succeed — a shopper-visible photo that's larger than intended beats no
+    // photo at all. Flag it so it's not a silent surprise.
+    meta.compressionError = String(err.message || err);
+    meta.storedBytes = bytes.length;
+    meta.savedPercent = 0;
+  } finally {
+    await env.PRODUCT_IMAGES.delete(tmpKey).catch(() => {});
+  }
+
+  // This IS the stored file now — already reduced, not a full-size original
+  // waiting to be shrunk later. Every delivered size (thumb/card/detail/zoom)
+  // is derived from this already-smaller master.
   const key = `products/${sku}/${index}.master`;
   await env.PRODUCT_IMAGES.put(key, bytes, {
-    httpMetadata: { contentType: meta.cutout ? "image/png" : file.type },
+    httpMetadata: { contentType },
     customMetadata: {
       sku,
       index: String(index),
@@ -147,13 +227,15 @@ async function handleUpload(request, env) {
     index,
     key,
     ...meta,
-    originalBytes: file.size,
+    originalBytes,
     // The storefront references these paths; encoding happens at request time.
     urls: Object.fromEntries(
       Object.keys(VARIANTS).map((v) => [v, `/img/${sku}/${index}/${v}`])
     ),
     note:
-      meta.cutoutError === "not_configured"
+      meta.compressionError
+        ? "Saved at original size — the compression step didn't run this time. Safe to re-upload later once resolved."
+        : meta.cutoutError === "not_configured"
         ? "Saved as shot — automatic background cleanup isn't turned on yet. Photo was still compressed and optimised."
         : meta.cutoutError
         ? "Saved as shot — automatic cleanup didn't run on this photo. Photo was still compressed and optimised."
