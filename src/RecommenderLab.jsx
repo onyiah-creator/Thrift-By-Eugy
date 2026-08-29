@@ -10,6 +10,11 @@ const PANEL = "#141416";
 const LINE = "#2a2a2d";
 const IVORY = "#F3ECDD";
 
+// A product row can claim an image_count whose object was never stored, and a
+// variant can 404. Hiding the <img> reveals the colour gradient painted behind
+// it, which is a far better empty state than a broken-image icon.
+const hideBrokenImage = (e) => { e.currentTarget.style.display = "none"; };
+
 const naira = (n) => "₦" + n.toLocaleString("en-NG");
 
 function Thumb({ p, active, onClick }) {
@@ -20,7 +25,7 @@ function Thumb({ p, active, onClick }) {
       style={{ border: `1px solid ${active ? GOLD : LINE}`, background: PANEL }}
     >
       <div className="relative h-[110px]" style={{ background: `linear-gradient(160deg, ${p.color} 0%, #0A0A0C 135%)` }}>
-        {p.image && <img src={p.image} alt={p.name} className="absolute inset-0 w-full h-full object-contain p-1.5" />}
+        {p.image && <img src={p.image} alt={p.name} onError={hideBrokenImage} className="absolute inset-0 w-full h-full object-contain p-1.5" />}
       </div>
       <div className="p-1.5">
         <p className="text-[10px] leading-tight truncate" style={{ color: IVORY }}>{p.name}</p>
@@ -34,7 +39,7 @@ function ResultRow({ p, seed, score }) {
   return (
     <div className="flex gap-3 items-center py-2.5" style={{ borderBottom: `1px solid ${LINE}` }}>
       <div className="relative w-12 h-14 rounded overflow-hidden shrink-0" style={{ background: `linear-gradient(160deg, ${p.color} 0%, #0A0A0C 135%)` }}>
-        {p.image && <img src={p.image} alt={p.name} className="absolute inset-0 w-full h-full object-contain" />}
+        {p.image && <img src={p.image} alt={p.name} onError={hideBrokenImage} className="absolute inset-0 w-full h-full object-contain" />}
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-[12px] truncate" style={{ color: IVORY }}>{p.name}</p>
@@ -156,7 +161,7 @@ export default function RecommenderLab() {
               {look.map((p) => (
                 <div key={p.sku} className="rounded-md overflow-hidden" style={{ border: `1px solid ${LINE}`, background: PANEL }}>
                   <div className="relative h-28" style={{ background: `linear-gradient(160deg, ${p.color} 0%, #0A0A0C 135%)` }}>
-                    {p.image && <img src={p.image} alt={p.name} className="absolute inset-0 w-full h-full object-contain p-1.5" />}
+                    {p.image && <img src={p.image} alt={p.name} onError={hideBrokenImage} className="absolute inset-0 w-full h-full object-contain p-1.5" />}
                   </div>
                   <div className="p-2">
                     <p className="text-[11px] leading-tight truncate" style={{ color: IVORY }}>{p.name}</p>

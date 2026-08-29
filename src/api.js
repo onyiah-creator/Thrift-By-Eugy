@@ -13,6 +13,7 @@
  */
 
 const LIVE_API = "https://thriftbyeugy-api.onyiah.workers.dev";
+const LIVE_IMAGE_WORKER = "https://thriftbyeugy-images.onyiah.workers.dev";
 
 export const API_BASE =
   import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? "" : LIVE_API);
@@ -60,18 +61,36 @@ function colorHex(name, sku = "") {
   return FALLBACK_PALETTE[h % FALLBACK_PALETTE.length];
 }
 
-// Photos already committed to public/products/, used until the image pipeline
-// Worker is deployed. Set VITE_IMAGE_BASE to serve from that Worker instead.
-const LOCAL_IMAGES = {
-  "TBE-0001": "/products/TBE-0001_coral-peplum-top.png",
-  "TBE-0002": "/products/TBE-0002_lime-ruffle-top.png",
-  "TBE-0003": "/products/TBE-0001_coral-peplum-top.png",
-};
+// ---------------------------------------------------------------------------
+// Image URLs
+//
+// The image Worker serves /img/{sku}/{index}/{variant}, so a URL is derivable
+// from the SKU alone — no per-product mapping. Variants exist to avoid sending
+// a 1200px file to a grid thumbnail, so pick the one that matches the slot.
+// ---------------------------------------------------------------------------
+export const IMAGE_BASE = (
+  import.meta.env.VITE_IMAGE_BASE || LIVE_IMAGE_WORKER
+).replace(/\/$/, "");
 
-function imageFor(p) {
-  const base = import.meta.env.VITE_IMAGE_BASE;
-  if (base && p.images?.length) return base.replace(/\/$/, "") + p.images[0].card;
-  return LOCAL_IMAGES[p.sku] || null;
+export function imageUrl(sku, index = 1, variant = "card") {
+  if (!sku) return null;
+  return `${IMAGE_BASE}/img/${encodeURIComponent(sku)}/${index}/${variant}`;
+}
+
+/**
+ * A product only has photos once one has actually been uploaded, which the
+ * database records as image_count. Trusting that count can still be wrong —
+ * a row seeded with a count whose object was never stored 404s — so every
+ * <img> that renders these hides itself on error and lets the colour gradient
+ * behind it show instead of a broken-image icon.
+ */
+function imagesFor(p) {
+  const count = Number(p.imageCount ?? p.image_count) || 0;
+  if (!count) return { image: null, imageDetail: null };
+  return {
+    image: imageUrl(p.sku, 1, "card"),
+    imageDetail: imageUrl(p.sku, 1, "detail"),
+  };
 }
 
 /**
@@ -88,7 +107,7 @@ export function normaliseProduct(p, i = 0) {
     id: p.sku,
     color: colorHex(p.color, p.sku),
     colorName: p.color,
-    image: imageFor(p),
+    ...imagesFor(p),
     height: 250 + (h % 150),
     quantity: 1,
     status: "active",
@@ -180,15 +199,18 @@ export const admin = {
 // ---------------------------------------------------------------------------
 // Image pipeline Worker (images/worker-images.js)
 //
-// Separate deployment from the products API, but it accepts the SAME admin
-// token. Until VITE_IMAGE_API is set there is nowhere to upload to, so the
-// admin panel says so rather than pretending a photo was stored.
+// Same Worker that serves /img/, and it accepts the SAME admin token as the
+// products API. Uploads therefore go to the delivery host unless
+// VITE_IMAGE_API deliberately points somewhere else.
 // ---------------------------------------------------------------------------
-export const IMAGE_API = import.meta.env.VITE_IMAGE_API || "";
+// Uploads are fetch() calls, and the Worker only allows ADMIN_ORIGIN, so in
+// development they go through the dev-server proxy (same-origin) exactly like
+// the products API. Delivery URLs above stay absolute — <img> needs no CORS.
+export const IMAGE_API = (
+  import.meta.env.VITE_IMAGE_API ?? (import.meta.env.DEV ? "" : LIVE_IMAGE_WORKER)
+).replace(/\/$/, "");
 
 export async function uploadPhoto(token, { sku, index, file, processing = "asis" }) {
-  if (!IMAGE_API) throw new ApiError("No image Worker configured (VITE_IMAGE_API).", 0);
-
   const form = new FormData();
   form.append("sku", sku);
   form.append("index", String(index));
@@ -197,7 +219,7 @@ export async function uploadPhoto(token, { sku, index, file, processing = "asis"
 
   let res;
   try {
-    res = await fetch(`${IMAGE_API.replace(/\/$/, "")}/admin/upload`, {
+    res = await fetch(`${IMAGE_API}/admin/upload`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
       body: form, // no Content-Type header: the browser sets the multipart boundary

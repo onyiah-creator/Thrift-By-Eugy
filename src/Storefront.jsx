@@ -38,6 +38,11 @@ const EDITS = [
 
 const PALETTE = ["#C8836B", "#7E9B8A", "#C9A227", "#6E7BA6", "#B5674F", "#5F8A8A", "#9A6E92", "#8A8A55"];
 
+// A product row can claim an image_count whose object was never stored, and a
+// variant can 404. Hiding the <img> reveals the colour gradient painted behind
+// it, which is a far better empty state than a broken-image icon.
+const hideBrokenImage = (e) => { e.currentTarget.style.display = "none"; };
+
 const naira = (n) => "\u20A6" + n.toLocaleString("en-NG");
 
 // ---------------------------------------------------------------------------
@@ -91,7 +96,7 @@ function Card({ p, onOpen, onSave, saved, tall }) {
         {p.image && (
           <img
             src={p.image}
-            alt={p.name}
+            alt={p.name} onError={hideBrokenImage}
             loading="lazy"
             className="absolute inset-0 w-full h-full object-contain p-2"
           />
@@ -367,7 +372,7 @@ export default function Storefront() {
               {ALL.slice(0, 4).map((p, i) => (
                 <div key={p.id} className="relative rounded-sm overflow-hidden" style={{ height: i % 2 === 0 ? 175 : 215, marginTop: i % 2 === 0 ? 28 : 0, background: `linear-gradient(165deg, ${p.color}33 0%, ${p.color}99 100%)`, border: `1px solid ${HAIR}` }}>
                   {p.image && (
-                    <img src={p.image} alt={p.name} className="absolute inset-0 w-full h-full object-contain p-2" />
+                    <img src={p.image} alt={p.name} onError={hideBrokenImage} className="absolute inset-0 w-full h-full object-contain p-2" />
                   )}
                 </div>
               ))}
@@ -381,7 +386,7 @@ export default function Storefront() {
                 <button key={c} onClick={() => goCat(c)} className="shrink-0 text-center group">
                   <div className="relative w-[68px] h-[68px] rounded-full mb-2 transition-transform group-hover:scale-105 overflow-hidden" style={{ background: `linear-gradient(150deg, ${PALETTE[i]}44 0%, ${PALETTE[i]} 130%)`, border: `1px solid ${HAIR}` }}>
                     {categoryFace[c] && (
-                      <img src={categoryFace[c]} alt={c} className="absolute inset-0 w-full h-full object-cover object-top" />
+                      <img src={categoryFace[c]} alt={c} onError={hideBrokenImage} className="absolute inset-0 w-full h-full object-cover object-top" />
                     )}
                   </div>
                   <span className="text-[11px]" style={{ color: INK }}>{c}</span>
@@ -515,8 +520,10 @@ export default function Storefront() {
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4" style={{ background: "rgba(0,0,0,0.45)" }} onClick={() => setQuick(null)}>
           <div className="w-full sm:max-w-md rounded-t-lg sm:rounded-lg overflow-hidden" style={{ background: WHITE }} onClick={(e) => e.stopPropagation()}>
             <div className="relative" style={{ height: 270, background: `linear-gradient(165deg, ${quick.color}33 0%, ${quick.color}99 100%)` }}>
-              {quick.image && (
-                <img src={quick.image} alt={quick.name} className="absolute inset-0 w-full h-full object-contain p-3" />
+              {/* The 270px-tall modal deserves the larger variant; grid cards
+                  stay on `card` so a thumbnail never pulls a 1200px file. */}
+              {(quick.imageDetail || quick.image) && (
+                <img src={quick.imageDetail || quick.image} alt={quick.name} onError={hideBrokenImage} className="absolute inset-0 w-full h-full object-contain p-3" />
               )}
             </div>
             <div className="p-5">
@@ -540,7 +547,7 @@ export default function Storefront() {
                       <button key={p.sku} onClick={() => open(p)} className="flex-1 text-left overflow-hidden rounded-sm" style={{ border: `1px solid ${HAIR}` }}>
                         <div className="relative h-14" style={{ background: `linear-gradient(165deg, ${p.color}33 0%, ${p.color}88 100%)` }}>
                           {p.image && (
-                            <img src={p.image} alt={p.name} className="absolute inset-0 w-full h-full object-contain p-1" />
+                            <img src={p.image} alt={p.name} onError={hideBrokenImage} className="absolute inset-0 w-full h-full object-contain p-1" />
                           )}
                         </div>
                         <div className="px-1.5 py-1">
@@ -613,7 +620,7 @@ export default function Storefront() {
                     <div key={p.id} className="flex gap-3 items-center pb-4" style={{ borderBottom: `1px solid ${HAIR}` }}>
                       <div className="relative w-16 h-20 rounded-sm shrink-0 overflow-hidden" style={{ background: `linear-gradient(165deg, ${p.color}33 0%, ${p.color}99 100%)`, border: `1px solid ${HAIR}` }}>
                         {p.image && (
-                          <img src={p.image} alt={p.name} className="absolute inset-0 w-full h-full object-contain" />
+                          <img src={p.image} alt={p.name} onError={hideBrokenImage} className="absolute inset-0 w-full h-full object-contain" />
                         )}
                       </div>
                       <div className="flex-1">

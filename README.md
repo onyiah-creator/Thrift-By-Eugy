@@ -94,10 +94,15 @@ The Worker sets `Access-Control-Allow-Origin` to `SITE_ORIGIN` (the deployed Pag
 | --- | --- |
 | `VITE_API_URL` | Override the API base (e.g. a local mock). Defaults to the dev proxy in development and the live Worker in a build. |
 | `VITE_API_PROXY` | Change what the dev/preview proxy points at. |
-| `VITE_IMAGE_BASE` | Serve product photos from the image pipeline Worker. Until it is deployed, the committed photos in `public/products/` are used, and anything without one falls back to its colour gradient. |
-| `VITE_IMAGE_API` | Image Worker base URL for admin uploads. Unset means photos are previewed but not stored. |
+| `VITE_IMAGE_BASE` | Where `<img>` fetches product photos. Absolute is safe in every environment — images need no CORS. Defaults to the live image Worker. |
+| `VITE_IMAGE_API` | Where photo uploads are `POST`ed. Like `VITE_API_URL`, leave unset: uploads are `fetch()` calls and the Worker only allows `ADMIN_ORIGIN`, so development routes them through the proxy. |
+| `VITE_IMAGE_PROXY` | Change what the dev/preview proxy sends `/admin/upload` to. |
 
 The API stores a colour *name* ("Coral"); the client maps it to a hex for the card gradient behind a cut-out photo, falling back to a stable palette pick per SKU.
+
+Photo URLs are derived from the SKU alone — `{IMAGE_BASE}/img/{sku}/{index}/{variant}` — so any product with `image_count > 0` resolves without a per-product mapping. Grid cards request the `card` variant and the quick-view modal requests `detail`, so a thumbnail never pulls a 1200px file. A row can claim an `image_count` whose object was never stored (the seeded sample rows do), so every product `<img>` hides itself on error and lets the colour gradient show rather than a broken-image icon.
+
+`.env` sets only `VITE_IMAGE_BASE`. **Cloudflare Pages does not read it** — set the same variable in the Pages dashboard as a *build-time* variable and redeploy, since Vite inlines it at build.
 
 ## Products & admin API
 
