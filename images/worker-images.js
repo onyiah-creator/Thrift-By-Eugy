@@ -33,20 +33,32 @@ const VARIANTS = {
 
 export default {
   async fetch(request, env, ctx) {
-    const url = new URL(request.url);
+    try {
+      const url = new URL(request.url);
 
-    if (request.method === "OPTIONS") return cors(new Response(null, { status: 204 }), env);
+      if (request.method === "OPTIONS") return cors(new Response(null, { status: 204 }), env);
 
-    if (url.pathname === "/admin/upload" && request.method === "POST") {
-      return cors(await handleUpload(request, env), env);
+      if (url.pathname === "/admin/upload" && request.method === "POST") {
+        return cors(await handleUpload(request, env), env);
+      }
+      if (url.pathname.startsWith("/img/")) {
+        return handleDeliver(request, env, url, ctx);
+      }
+      if (url.pathname.startsWith("/_raw/")) {
+        return handleRaw(env, url);
+      }
+      return new Response("Not found", { status: 404 });
+    } catch (err) {
+      // Without this, any unhandled error (a malformed multipart body, an
+      // R2 failure, anything) surfaces as Cloudflare's generic "error 1101"
+      // page with no detail at all. Catching here turns that into an actual
+      // message you can act on instead of a mystery code to search for.
+      console.error("unhandled worker error", err);
+      return cors(
+        json({ error: "Upload failed.", detail: String(err.message || err) }, 500),
+        env
+      );
     }
-    if (url.pathname.startsWith("/img/")) {
-      return handleDeliver(request, env, url, ctx);
-    }
-    if (url.pathname.startsWith("/_raw/")) {
-      return handleRaw(env, url);
-    }
-    return new Response("Not found", { status: 404 });
   },
 };
 
