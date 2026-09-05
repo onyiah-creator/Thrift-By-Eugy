@@ -1,10 +1,14 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import { fetchSpinFrames } from "./api.js";
 
 /**
  * Thrift by Eugy — 360° Spin Viewer
  *
  * Production use:
- *   <SpinViewer frames={["/img/TBE-0001/spin/00", "/img/TBE-0001/spin/01", ...]} />
+ *   <SpinViewer sku="TBE-0087" />
+ * fetches the real frame list from the image Worker (GET /spin/{sku}) on
+ * mount. Passing `frames` directly still works and skips the fetch:
+ *   <SpinViewer frames={[url, url, ...]} />
  *
  * Frames are plain images swapped on drag — no video, no GIF. Each frame is
  * served as AVIF/WebP through the same image pipeline as every other product
@@ -23,7 +27,8 @@ const LINE = "#2a2a2d";
 // The viewer
 // ---------------------------------------------------------------------------
 export function SpinViewer({
-  frames = [],
+  sku = null,               // fetch real frames for this SKU from the image Worker
+  frames: framesProp = [],  // or hand frames in directly (demo/tests) — no fetch
   autoSpin = true,
   autoSpinSpeed = 110,     // ms per frame
   sensitivity = 1,          // higher = less drag needed for a full turn
@@ -34,9 +39,26 @@ export function SpinViewer({
   const [spinning, setSpinning] = useState(autoSpin);
   const [loaded, setLoaded] = useState(0);
   const [hasInteracted, setHasInteracted] = useState(false);
+  // null = list fetch still in flight; [] = fetched, no frames exist.
+  const [fetchedFrames, setFetchedFrames] = useState(null);
 
   const dragState = useRef({ startX: 0, startIndex: 0 });
   const containerRef = useRef(null);
+
+  // With a sku, the frame list comes from the image Worker; without one the
+  // caller's frames prop is authoritative (the demo harness below, tests).
+  useEffect(() => {
+    if (!sku) return;
+    let cancelled = false;
+    setFetchedFrames(null);
+    fetchSpinFrames(sku)
+      .then((urls) => { if (!cancelled) setFetchedFrames(urls); })
+      .catch(() => { if (!cancelled) setFetchedFrames([]); });
+    return () => { cancelled = true; };
+  }, [sku]);
+
+  const frames = sku ? fetchedFrames || [] : framesProp;
+  const listPending = !!sku && fetchedFrames === null;
   const count = frames.length;
 
   // Preload every frame up front. A spin that stutters mid-drag reads as
@@ -121,6 +143,22 @@ export function SpinViewer({
     setHasInteracted(true);
     setIndex((i) => (((i + dir) % count) + count) % count);
   };
+
+  // Frame list still being fetched for this SKU — hold the same-shaped shell
+  // rather than flashing "no spin frames" at a product that has them.
+  if (listPending) {
+    return (
+      <div
+        className="rounded-lg overflow-hidden flex flex-col items-center justify-center"
+        style={{ background: INK, border: `1px solid ${LINE}`, aspectRatio: "3 / 4" }}
+      >
+        <div className="w-28 h-[2px] rounded" style={{ background: LINE }} />
+        <p className="text-[11px] mt-2" style={{ color: "#777" }}>
+          Loading 360° view
+        </p>
+      </div>
+    );
+  }
 
   if (!count) {
     return (

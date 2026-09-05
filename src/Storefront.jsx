@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { CATEGORIES, fetchProducts } from "./api.js";
+import { SpinViewer } from "./SpinViewer.jsx";
 import { forYou, trending, completeTheLook } from "./recommender.js";
 
 /**
@@ -519,13 +520,25 @@ export default function Storefront() {
       {quick && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4" style={{ background: "rgba(0,0,0,0.45)" }} onClick={() => setQuick(null)}>
           <div className="w-full sm:max-w-md rounded-t-lg sm:rounded-lg overflow-hidden" style={{ background: WHITE }} onClick={(e) => e.stopPropagation()}>
-            <div className="relative" style={{ height: 270, background: `linear-gradient(165deg, ${quick.color}33 0%, ${quick.color}99 100%)` }}>
-              {/* The 270px-tall modal deserves the larger variant; grid cards
-                  stay on `card` so a thumbnail never pulls a 1200px file. */}
-              {(quick.imageDetail || quick.image) && (
-                <img src={quick.imageDetail || quick.image} alt={quick.name} onError={hideBrokenImage} className="absolute inset-0 w-full h-full object-contain p-3" />
-              )}
-            </div>
+            {quick.hasSpin ? (
+              /* Only when a real shot sequence exists (has_spin on the product
+                 record) does the 360° viewer take the photo slot — a product
+                 without one keeps the flat photo and never shows an empty
+                 spin box. The viewer is dark-themed, so it sits on ink. */
+              <div className="py-4" style={{ background: "#0A0A0C" }}>
+                <div className="mx-auto" style={{ width: 210 }}>
+                  <SpinViewer sku={quick.sku} />
+                </div>
+              </div>
+            ) : (
+              <div className="relative" style={{ height: 270, background: `linear-gradient(165deg, ${quick.color}33 0%, ${quick.color}99 100%)` }}>
+                {/* The 270px-tall modal deserves the larger variant; grid cards
+                    stay on `card` so a thumbnail never pulls a 1200px file. */}
+                {(quick.imageDetail || quick.image) && (
+                  <img src={quick.imageDetail || quick.image} alt={quick.name} onError={hideBrokenImage} className="absolute inset-0 w-full h-full object-contain p-3" />
+                )}
+              </div>
+            )}
             <div className="p-5">
               <div className="flex justify-between items-start gap-3">
                 <div>

@@ -232,3 +232,22 @@ export async function uploadPhoto(token, { sku, index, file, processing = "asis"
   if (!res.ok) throw new ApiError(data?.error || `Upload failed (${res.status})`, res.status);
   return data;
 }
+
+/**
+ * Spin frames for one SKU, as absolute delivery URLs ready for <img>.
+ * The list call is a fetch(), so like uploads it is origin-locked and goes
+ * through the dev-server proxy in development. The frame paths it returns
+ * become plain <img> sources — those need no CORS, so they point straight
+ * at the delivery host, same as every other product image.
+ */
+export async function fetchSpinFrames(sku) {
+  let res;
+  try {
+    res = await fetch(`${IMAGE_API}/spin/${encodeURIComponent(sku)}`);
+  } catch {
+    throw new ApiError("Could not reach the image service.", 0);
+  }
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new ApiError(data?.error || `Spin lookup failed (${res.status})`, res.status);
+  return (data?.frames || []).map((f) => `${IMAGE_BASE}${f}`);
+}

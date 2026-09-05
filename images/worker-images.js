@@ -41,6 +41,21 @@ export default {
       if (url.pathname === "/admin/upload" && request.method === "POST") {
         return cors(await handleUpload(request, env), env);
       }
+      if (url.pathname === "/admin/spin/upload" && request.method === "POST") {
+        return cors(await handleSpinUpload(request, env), env);
+      }
+      if (url.pathname === "/admin/spin/delete" && request.method === "POST") {
+        return cors(await handleSpinDelete(request, env), env);
+      }
+      if (url.pathname.startsWith("/spin/") && request.method === "GET") {
+        return cors(await handleSpinList(env, url), env);
+      }
+      if (url.pathname.startsWith("/spinimg/")) {
+        return handleSpinDeliver(request, env, url, ctx);
+      }
+      if (url.pathname.startsWith("/_rawspin/")) {
+        return handleRawSpin(env, url);
+      }
       if (url.pathname.startsWith("/img/")) {
         return handleDeliver(request, env, url, ctx);
       }
@@ -96,7 +111,16 @@ async function handleRaw(env, url) {
  * cf.image, which returns genuinely re-encoded, smaller bytes.
  */
 async function compressForStorage(env, sku, index, isCutout, origin, sourceType) {
-  const tmpUrl = new URL(`/_raw/${sku}/${index}?src=tmp`, origin);
+  return compressForStorageAt(env, isCutout, sourceType, origin, `/_raw/${sku}/${index}`);
+}
+
+/**
+ * The compression itself, parameterised on the internal raw-serving path so
+ * the product-photo and spin-frame upload paths share one implementation
+ * instead of maintaining two copies of the same resize logic.
+ */
+async function compressForStorageAt(env, isCutout, sourceType, requestUrl, rawPath) {
+  const tmpUrl = new URL(`${rawPath}?src=tmp`, requestUrl);
 
   // Anything that CAN carry alpha must stay in a format that has alpha.
   // Keying this off isCutout alone flattens every transparent PNG a shopper
@@ -275,6 +299,175 @@ async function runCutout(bytes, contentType, env) {
       backdrop: res.headers.get("X-Backdrop-Applied") || "",   // "ink" | "white"
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// 360° spin: an ORDERED SEQUENCE of frames for one SKU, stored separately
+// from the up-to-5 flat product photos above. This is real infrastructure
+// for a real spin — it does NOT synthesize rotation from a single photo.
+// A spin only exists once someone has actually shot 24-36 frames of the
+// garment turning on the mannequin (see SPIN_GUIDE.md for the technique).
+// ---------------------------------------------------------------------------
+
+/**
+ * Upload one frame of a spin sequence. Called once per frame — the admin
+ * side (or a bulk script) loops over an ordered folder of photos and posts
+ * each one here in turn. Frames are always treated as photographed as-shot;
+ * running the cutout/backdrop-choice logic per-frame would risk each frame
+ * picking a slightly different crop or backdrop, which is far more visible
+ * and distracting in a spinning sequence than in a single static photo.
+ */
+async function handleSpinUpload(request, env) {
+  const auth = await requireAdmin(request, env);
+  if (auth) return auth;
+
+  const form = await request.formData();
+  const file = form.get("file");
+  const sku = (form.get("sku") || "").trim();
+  const frame = parseInt(form.get("frame") || "", 10);
+
+  if (!file || typeof file === "string") return json({ error: "No file uploaded." }, 400);
+  if (!sku) return json({ error: "SKU is required." }, 400);
+  if (!Number.isFinite(frame) || frame < 0 || frame > 99) {
+    return json({ error: "Frame number must be between 0 and 99." }, 400);
+  }
+  if (file.size > MAX_UPLOAD_BYTES) {
+    return json({ error: "That photo is over 15MB. Try a smaller export." }, 413);
+  }
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    return json({ error: `Unsupported file type: ${file.type}` }, 415);
+  }
+
+  const frameStr = String(frame).padStart(2, "0");
+  let bytes = new Uint8Array(await file.arrayBuffer());
+  const originalBytes = file.size;
+
+  const tmpKey = `products/${sku}/spin/${frameStr}.upload-tmp`;
+  await env.PRODUCT_IMAGES.put(tmpKey, bytes, { httpMetadata: { contentType: file.type } });
+
+  let contentType = file.type;
+  let savedPercent = 0;
+  try {
+    const compressed = await compressForStorageAt(
+      env, false, file.type, request.url, `/_rawspin/${sku}/${frameStr}`
+    );
+    bytes = compressed.bytes;
+    contentType = compressed.contentType;
+    savedPercent = Math.max(0, Math.round((1 - bytes.length / originalBytes) * 100));
+  } catch (err) {
+    // Same rule as the main upload path: never lose the frame because
+    // compression failed. A larger-than-intended frame beats a missing one.
+  } finally {
+    await env.PRODUCT_IMAGES.delete(tmpKey).catch(() => {});
+  }
+
+  const key = `products/${sku}/spin/${frameStr}.master`;
+  await env.PRODUCT_IMAGES.put(key, bytes, {
+    httpMetadata: { contentType },
+    customMetadata: { sku, frame: frameStr, uploadedAt: new Date().toISOString() },
+  });
+
+  return json({ ok: true, sku, frame, key, originalBytes, storedBytes: bytes.length, savedPercent });
+}
+
+/**
+ * Deletes every frame for a SKU — used when replacing a bad shoot, or when
+ * a product is archived. Deliberately whole-sequence: a spin with some
+ * frames from an old shoot and some from a new one would jump and stutter,
+ * which is worse than having no spin at all.
+ */
+async function handleSpinDelete(request, env) {
+  const auth = await requireAdmin(request, env);
+  if (auth) return auth;
+
+  const body = await request.json();
+  const sku = (body.sku || "").trim();
+  if (!sku) return json({ error: "SKU is required." }, 400);
+
+  const listed = await env.PRODUCT_IMAGES.list({ prefix: `products/${sku}/spin/` });
+  const keys = (listed.objects || []).map((o) => o.key);
+  if (keys.length) {
+    await Promise.all(keys.map((k) => env.PRODUCT_IMAGES.delete(k)));
+  }
+  return json({ ok: true, sku, deleted: keys.length });
+}
+
+/**
+ * Lists the frames actually available for a SKU, in order, as ready-to-use
+ * URLs. The frontend calls this once per product rather than guessing a
+ * frame count — a product with no spin returns an empty list, which the
+ * viewer already renders as "No spin frames for this item yet."
+ */
+async function handleSpinList(env, url) {
+  const sku = decodeURIComponent(url.pathname.split("/").pop());
+  const listed = await env.PRODUCT_IMAGES.list({ prefix: `products/${sku}/spin/` });
+
+  const frames = (listed.objects || [])
+    .map((o) => o.key.match(/\/(\d{2})\.master$/))
+    .filter(Boolean)
+    .map((m) => m[1])
+    .sort((a, b) => Number(a) - Number(b));
+
+  return json({
+    sku,
+    count: frames.length,
+    frames: frames.map((f) => `/spinimg/${sku}/${f}/card`),
+  });
+}
+
+/** Same resize/format-negotiation delivery as handleDeliver, for spin frames. */
+async function handleSpinDeliver(request, env, url, ctx) {
+  const [, , sku, frame, variantName] = url.pathname.split("/");
+  const variant = VARIANTS[variantName] || VARIANTS.card;
+
+  const cache = caches.default;
+  const cacheKey = new Request(url.toString() + "|" + pickFormat(request), request);
+  const hit = await cache.match(cacheKey);
+  if (hit) return hit;
+
+  const exists = await env.PRODUCT_IMAGES.head(`products/${sku}/spin/${frame}.master`);
+  if (!exists) return new Response("Frame not found", { status: 404 });
+
+  const format = pickFormat(request);
+  const rawUrl = new URL(`/_rawspin/${sku}/${frame}`, url.origin);
+  const response = await fetch(rawUrl, {
+    cf: { image: { width: variant.width, quality: variant.quality, format, fit: "scale-down", metadata: "none" } },
+  });
+
+  if (!response.ok) {
+    const fallback = await env.PRODUCT_IMAGES.get(`products/${sku}/spin/${frame}.master`);
+    return new Response(fallback.body, {
+      headers: {
+        "Content-Type": fallback.httpMetadata?.contentType || "application/octet-stream",
+        "Cache-Control": "public, max-age=3600",
+      },
+    });
+  }
+
+  const out = new Response(response.body, {
+    headers: {
+      "Content-Type": `image/${format === "baseline-jpeg" ? "jpeg" : format}`,
+      "Cache-Control": "public, max-age=31536000, immutable",
+      Vary: "Accept",
+    },
+  });
+
+  ctx.waitUntil(cache.put(cacheKey, out.clone()));
+  return out;
+}
+
+/** Internal-only raw byte serving for spin frames — mirrors handleRaw,
+ * including honoring ?src=tmp so compressForStorageAt can read the
+ * just-uploaded temp file before the real master exists. */
+async function handleRawSpin(env, url) {
+  const [, , sku, frame] = url.pathname.split("/");
+  const useTmp = url.searchParams.get("src") === "tmp";
+  const key = `products/${sku}/spin/${frame}.${useTmp ? "upload-tmp" : "master"}`;
+  const object = await env.PRODUCT_IMAGES.get(key);
+  if (!object) return new Response("Not found", { status: 404 });
+  return new Response(object.body, {
+    headers: { "Content-Type": object.httpMetadata?.contentType || "application/octet-stream" },
+  });
 }
 
 // ---------------------------------------------------------------------------

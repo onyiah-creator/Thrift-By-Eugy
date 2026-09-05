@@ -15,20 +15,24 @@ export default defineConfig({
     proxy: {
       "/api": { target: API_TARGET, changeOrigin: true, secure: true },
       // Photo uploads are origin-locked to ADMIN_ORIGIN on the image Worker,
-      // so they are proxied too. Image DELIVERY (/img/) is not proxied: an
+      // so they are proxied too, and the spin-frame list is a fetch() with the
+      // same origin lock. Image DELIVERY (/img/, /spinimg/) is not proxied: an
       // <img> loads cross-origin without CORS and should hit the Worker's
       // cache directly.
       "/admin/upload": { target: IMAGE_TARGET, changeOrigin: true, secure: true },
+      "/spin": { target: IMAGE_TARGET, changeOrigin: true, secure: true },
     },
   },
   preview: {
     proxy: {
       "/api": { target: API_TARGET, changeOrigin: true, secure: true },
       // Photo uploads are origin-locked to ADMIN_ORIGIN on the image Worker,
-      // so they are proxied too. Image DELIVERY (/img/) is not proxied: an
+      // so they are proxied too, and the spin-frame list is a fetch() with the
+      // same origin lock. Image DELIVERY (/img/, /spinimg/) is not proxied: an
       // <img> loads cross-origin without CORS and should hit the Worker's
       // cache directly.
       "/admin/upload": { target: IMAGE_TARGET, changeOrigin: true, secure: true },
+      "/spin": { target: IMAGE_TARGET, changeOrigin: true, secure: true },
     },
   },
 });
